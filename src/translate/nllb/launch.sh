@@ -8,6 +8,9 @@
 #SBATCH --output=/home/pgajo/checkthat24/.slurm/%j_output.log
 #SBATCH --error=/home/pgajo/checkthat24/.slurm/%j_error.log
 
+eval "$(conda shell.bash hook)"
+conda activate checkthat
+
 declare -a tgt_languages=(
 # 'ita_Latn'
 'rus_Cyrl'

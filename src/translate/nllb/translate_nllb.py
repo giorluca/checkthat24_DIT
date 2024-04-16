@@ -8,7 +8,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="translate checkthat task 3 dataset")
-    parser.add_argument("--dataset_path", help="source language", default="eng_Latn")
+    parser.add_argument("--dataset_path", help="source language", default="/home/pgajo/checkthat24/data/annotated_train.json")
     parser.add_argument("--model_name", help="model huggingface repo name or model dir path", default="facebook/nllb-200-3.3B")
     parser.add_argument("--train_dir", help="path to translated train data directory", default='/home/pgajo/checkthat24/checkthat24_DIT/data/train')
     parser.add_argument("--src_lang", help="source language", default="eng_Latn")
@@ -18,6 +18,12 @@ def main():
     lang_dict = {
         "eng_Latn": 'en',
         "ita_Latn": 'it',
+        'rus_Cyrl': 'ru',
+        'spa_Latn': 'es',
+        'arb_Arab': 'ar',
+        'por_Latn': 'po',
+        'slv_Latn': 'sl',
+        'bul_Cyrl': 'bg',
     }
 
     model_name_simple = args.model_name.split('/')[-1]
@@ -28,15 +34,13 @@ def main():
                                                 #   attn_implementation="flash_attention_2", # not implemented yet for M2M100ForConditionalGeneration
                                                 )
 
-    dataset_path = "/home/pgajo/checkthat24/annotated_train.json"
-
-    with open(dataset_path, 'r', encoding='utf8') as f:
+    with open(args.dataset_path, 'r', encoding='utf8') as f:
         data = json.load(f)
 
     data = [line for line in data if line['lang'] == lang_dict[args.src_lang]]
 
     translated_dicts = []
-    # count = 0
+    count = 0
     batch_size = 4
     for line in tqdm(data, total=len(data)):
         text_input_list = [text for text in re.sub(r'\n\n+', r'\n', line['text']).split('\n') if text] # remove any possible empty lines
@@ -65,13 +69,13 @@ def main():
         line.pop('text')
         translated_dicts.append(dict(sorted(line.items())))
         # count += 1
-        # if count > 3:
+        # if count > 1:
         #     break
 
     output_dir = os.path.join(args.train_dir, '-'.join([lang_dict[args.src_lang], lang_dict[args.tgt_lang]]))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    output_filename = os.path.basename(dataset_path).replace('.json', f'_translated_{model_name_simple}.json')
+    output_filename = os.path.basename(args.dataset_path).replace('.json', f'_translated_{model_name_simple}.json')
     with open(os.path.join(output_dir, output_filename), 'w', encoding='utf8') as f:
         json.dump(translated_dicts, f, ensure_ascii = False)
 
