@@ -1,5 +1,5 @@
 models/
 # data/
-*.json
+# *.json
 *.pyc
-data/*.txt
+data/**/*.txt
