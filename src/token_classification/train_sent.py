@@ -83,10 +83,23 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 def preprocess(samples, tokenizer):
     texts = []
     ents_list = []
-    for text, annotation in zip(samples['text'], samples['annotations']):
-        out_text, out_ents = sub_shift_spans(text, annotation, mappings=mappings)
+    for text, annotation_list in zip(samples['text'], samples['annotations']):
+        for annotation in annotation_list:
+            out_text, out_ents = sub_shift_spans(text, annotation, mappings=mappings)
 
-        
+            out_text_split = re.findall(r'[^\s]+', out_text)
+            labels_words = []
+            for match in out_text_split:
+                if match.start < out_ents['start']:
+                    labels_words.append(labels.labels_to_id['O'])
+                elif match.start == out_ents['start']:
+                    labels_words.append(labels.labels_to_id['B-' + out_ents['tag']])
+                elif i > out_ents['start'] and i < out_ents['end']:
+                    labels_words.append(labels.labels_to_id['I-' + out_ents['tag']])
+                else:
+                    labels_words.append(labels.labels_to_id['O'])
+            
+            ic(labels_words)
 
         # output = tokenizer(out_text, return_tensors = 'pt', padding = 'longest', truncation = True)
         # index_tok_start = output.token_to_char(annotation['start'])
