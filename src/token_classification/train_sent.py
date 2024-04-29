@@ -1,49 +1,78 @@
-from sequence_aligner.labelset import LabelSet
-from sequence_aligner.dataset import TrainingDataset
-from sequence_aligner.containers import TrainingBatch
 import json
-from transformers import XLMRobertaTokenizerFast, XLMRobertaForTokenClassification, TrainingArguments, Trainer, AutoTokenizer, AutoModelForTokenClassification
+from sequence_aligner.labelset import LabelSet
+from transformers import AutoTokenizer, AutoModelForTokenClassification
 from torch.utils.data import DataLoader
 import torch
 from torch.optim import AdamW
 from tqdm import tqdm
 from sklearn.metrics import classification_report
 import numpy as np
-from datasets import Dataset as hf_Dataset   
-from torch.utils.data import Dataset
+from datasets import Dataset as Dataset
 import pandas as pd
 import os
 import sys
 sys.path.append('/home/pgajo/food/src')
-#from utils_food import save_local_model
+from utils_food import save_local_model
+from icecream import ic
 import re
 from datetime import datetime
 date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
 # train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold.json'
-train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_binary.json'
+train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json'
 
 with open(train_data_path, 'r', encoding='utf8') as f:
     dataset_raw = json.load(f)
 
-df = pd.DataFrame(dataset_raw)
-dataset = hf_Dataset.from_pandas(df[['lang', 'annotations', 'text', 'article_id']])#.filter(lambda example: example["text"] is not None) # some samples have no text and cannot be tokenized so we filter them out
+df_raw = pd.DataFrame(dataset_raw)  
+
+df_pos = df_raw[df_raw['annotations'].apply(lambda x: len(x) > 0)]
+ic(df_pos)
+df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_pos))
+ic(df_neg)
+df = pd.concat([
+    df_pos,
+    # df_neg
+    ]
+    )
+ic(len(df_pos))
+ic(len(df_neg))
+ic(len(df))
+dataset = Dataset.from_pandas(df[['lang', 'annotations', 'text', 'article_id']]).filter(lambda example: example["text"] is not None) # some samples have no text and cannot be tokenized so we filter them out
 # dataset = dataset.filter(lambda example: example['lang'] == 'en')
 split_ratio = 0.2
 split_seed = 42
 datadict = dataset.train_test_split(split_ratio, seed=split_seed)
-train_data = datadict['train']
-val_data = datadict['test']
 
+mappings = [
+    {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
+    {'pattern': r'\s+', 'target': ' '},
+    ]
 
-# labels = ["Appeal_to_Authority", "Appeal_to_Popularity", "Appeal_to_Values", "Appeal_to_Fear-Prejudice", "Flag_Waving",
-#                              "Causal_Oversimplification", "False_Dilemma-No_Choice", "Consequential_Oversimplification", "Straw_Man",
-#                              "Red_Herring", "Whataboutism", "Slogans", "Appeal_to_Time", "Conversation_Killer", "Loaded_Language",
-#                              "Repetition", "Exaggeration-Minimisation", "Obfuscation-Vagueness-Confusion", "Name_Calling-Labeling", "Doubt",
-#                              "Guilt_by_Association", "Appeal_to_Hypocrisy", "Questioning_the_Reputation"]
-# label_set = LabelSet(labels=labels)
-labels = ["persuasion"]
-label_set = LabelSet(labels=labels)
+def sub_shift_spans(text, ent_list, mappings = [], diacritics = 'àèìòùáéíóúÀÈÌÒÙÁÉÍÓÚ'):
+    for mapping in mappings:
+        adjustment = 0
+        pattern = re.compile(mapping['pattern'])
+        for match in re.finditer(pattern, text):
+            match_index = match.start() + adjustment
+            match_contents = match.group()
+            if match_contents not in diacritics:
+                subbed_text = mapping['target'].replace('placeholder', match_contents)
+            else:
+                subbed_text = match_contents
+            len_diff = len(subbed_text) - len(match_contents)
+            text = text[:match_index] + subbed_text + text[match_index + len(match_contents):]
+            
+            for ent in ent_list:
+                if ent['start'] <= match_index and ent['end'] > match_index:
+                    ent['end'] += len_diff
+                if ent['start'] > match_index:
+                    ent['start'] += len_diff
+                    ent['end'] += len_diff
+            adjustment += len_diff
+    # for ent in ent_list:
+    #     ic(text[ent['start']:ent['end']])
+    return text, ent_list
 
 model_name = 'bert-base-multilingual-cased'
 # model_name = 'xlm-roberta-base'
@@ -51,14 +80,48 @@ model_name = 'bert-base-multilingual-cased'
 model_name_simple = model_name.split('/')[-1]
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-train_dataset = TrainingDataset(data=train_data,tokenizer=tokenizer,label_set=label_set, tokens_per_batch=128)#.filter(lambda example: example["labels"] is not None)
-val_dataset = TrainingDataset(data=val_data,tokenizer=tokenizer,label_set=label_set, tokens_per_batch=128)
+def preprocess(samples, tokenizer):
+    texts = []
+    ents_list = []
+    for text, annotation in zip(samples['text'], samples['annotations']):
+        out_text, out_ents = sub_shift_spans(text, annotation, mappings=mappings)
 
-train_loader = DataLoader(train_dataset, collate_fn=TrainingBatch, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_dataset, collate_fn=TrainingBatch, batch_size=64, shuffle=False)
+        
+
+        # output = tokenizer(out_text, return_tensors = 'pt', padding = 'longest', truncation = True)
+        # index_tok_start = output.token_to_char(annotation['start'])
+        # index_tok_end = output.token_to_char(annotation['end'])
+        # labels = []
+        # tag = annotation['tag'] # IT'S NOT JUST ONE TAG IN ONE SENTENCE IT CAN BE MORE THAN ONE
+        # for i in range(len(output['input_ids'].squeeze())):
+        #     if i < index_tok_start:
+        #         labels.append(labels.labels_to_id['O'])
+        #     elif i == index_tok_start:
+        #         labels.append(labels.labels_to_id['B-' + tag])
+        #     elif i > index_tok_start and i < index_tok_end:
+        #         labels.append(labels.labels_to_id['I-' + tag])
+        #     else:
+        #         labels.append(labels.labels_to_id['O'])
+        
+        # output['labels'] = torch.tensor(labels)
+
+
+    return samples
+
+datadict = datadict.map((lambda x: preprocess(x, tokenizer)), batched=True)
+
+train_data = datadict['train']
+val_data = datadict['test']
+
+labels = LabelSet(labels=df_pos['annotations'].apply(lambda x: x[0]['tag']).tolist())
+
+train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
+val_loader = DataLoader(val_data, batch_size=64, shuffle=False)
 
 model = AutoModelForTokenClassification.from_pretrained(model_name,
-                                                        num_labels=len(train_dataset.label_set.ids_to_label.values())
+                                                        num_labels=len(train_data),
+                                                        label2id=labels.labels_to_id,
+                                                        id2label=labels.ids_to_label,
                                                         )
 lr = 5e-5
 optimizer = AdamW(model.parameters(), lr=lr)
