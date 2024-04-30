@@ -12,7 +12,7 @@ class LabelSet:
         self.ids_to_label[0] = "O"
         num = 0  # in case there are no labels
         # Writing BILU will give us incremental ids for the labels
-        for _num, (label, s) in enumerate(itertools.product(labels, "BIO")):
+        for _num, (label, s) in enumerate(itertools.product(labels, "BI")):
             num = _num + 1  # skip 0
             l = f"{s}-{label}"
             self.labels_to_id[l] = num

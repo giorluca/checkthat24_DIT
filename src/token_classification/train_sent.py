@@ -32,7 +32,7 @@ df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_po
 ic(df_neg)
 df = pd.concat([
     df_pos,
-    # df_neg
+    df_neg
     ]
     )
 ic(len(df_pos))
@@ -44,12 +44,14 @@ split_ratio = 0.2
 split_seed = 42
 datadict = dataset.train_test_split(split_ratio, seed=split_seed)
 
+labels_model = LabelSet(labels=set(df_pos['annotations'].apply(lambda x: x[0]['tag']).tolist()))
+
 mappings = [
     {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
     {'pattern': r'\s+', 'target': ' '},
     ]
 
-def sub_shift_spans(text, ent_list, mappings = [], diacritics = 'àèìòùáéíóúÀÈÌÒÙÁÉÍÓÚ'):
+def sub_shift_spans(text, ents, mappings = [], diacritics = 'àèìòùáéíóúÀÈÌÒÙÁÉÍÓÚ'):
     for mapping in mappings:
         adjustment = 0
         pattern = re.compile(mapping['pattern'])
@@ -62,17 +64,25 @@ def sub_shift_spans(text, ent_list, mappings = [], diacritics = 'àèìòùáé�
                 subbed_text = match_contents
             len_diff = len(subbed_text) - len(match_contents)
             text = text[:match_index] + subbed_text + text[match_index + len(match_contents):]
-            
-            for ent in ent_list:
-                if ent['start'] <= match_index and ent['end'] > match_index:
-                    ent['end'] += len_diff
-                if ent['start'] > match_index:
-                    ent['start'] += len_diff
-                    ent['end'] += len_diff
+
+            if isinstance(ents, list):
+                for ent in ents:
+                    if ent['start'] <= match_index and ent['end'] > match_index:
+                        ent['end'] += len_diff
+                    if ent['start'] > match_index:
+                        ent['start'] += len_diff
+                        ent['end'] += len_diff
+            elif isinstance(ents, dict):
+                if ents['start'] <= match_index and ents['end'] > match_index:
+                    ents['end'] += len_diff
+                if ents['start'] > match_index:
+                    ents['start'] += len_diff
+                    ents['end'] += len_diff
+
             adjustment += len_diff
     # for ent in ent_list:
     #     ic(text[ent['start']:ent['end']])
-    return text, ent_list
+    return text, ents
 
 model_name = 'bert-base-multilingual-cased'
 # model_name = 'xlm-roberta-base'
@@ -80,61 +90,100 @@ model_name = 'bert-base-multilingual-cased'
 model_name_simple = model_name.split('/')[-1]
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-def preprocess(samples, tokenizer):
-    texts = []
-    ents_list = []
-    for text, annotation_list in zip(samples['text'], samples['annotations']):
-        for annotation in annotation_list:
-            out_text, out_ents = sub_shift_spans(text, annotation, mappings=mappings)
-
-            out_text_split = re.findall(r'[^\s]+', out_text)
+def span_to_words_annotation(samples, target_tag = ''):
+    samples_new = []
+    for i, (text, annotation_list) in enumerate(zip(samples['text'], samples['annotations'])):
+        labels_text = []
+        tokens = []
+        for j, annotation in enumerate(annotation_list):
+            text_subshifted, ents = sub_shift_spans(text, annotation, mappings=mappings)
+            text_subshifted_matches = re.finditer(r'[^\s]+', text_subshifted)
             labels_words = []
-            for match in out_text_split:
-                if match.start < out_ents['start']:
-                    labels_words.append(labels.labels_to_id['O'])
-                elif match.start == out_ents['start']:
-                    labels_words.append(labels.labels_to_id['B-' + out_ents['tag']])
-                elif i > out_ents['start'] and i < out_ents['end']:
-                    labels_words.append(labels.labels_to_id['I-' + out_ents['tag']])
+            first = 1
+            for k, match in enumerate(text_subshifted_matches):
+                if j == 0:
+                    tokens.append(match.group())
+                if match.start() < ents['start']:
+                    labels_words.append(labels_model.labels_to_id['O'])
+                elif match.start() >= ents['start'] and match.end() <= ents['end']:
+                    if first == 1:
+                        labels_words.append(labels_model.labels_to_id['B-' + ents['tag']])
+                        first = 0
+                    elif first == 0:
+                        labels_words.append(labels_model.labels_to_id['I-' + ents['tag']])
                 else:
-                    labels_words.append(labels.labels_to_id['O'])
-            
-            ic(labels_words)
+                    labels_words.append(labels_model.labels_to_id['O'])
+            labels_text.append({'labels': labels_words, 'tag': annotation['tag']})
 
-        # output = tokenizer(out_text, return_tensors = 'pt', padding = 'longest', truncation = True)
-        # index_tok_start = output.token_to_char(annotation['start'])
-        # index_tok_end = output.token_to_char(annotation['end'])
-        # labels = []
-        # tag = annotation['tag'] # IT'S NOT JUST ONE TAG IN ONE SENTENCE IT CAN BE MORE THAN ONE
-        # for i in range(len(output['input_ids'].squeeze())):
-        #     if i < index_tok_start:
-        #         labels.append(labels.labels_to_id['O'])
-        #     elif i == index_tok_start:
-        #         labels.append(labels.labels_to_id['B-' + tag])
-        #     elif i > index_tok_start and i < index_tok_end:
-        #         labels.append(labels.labels_to_id['I-' + tag])
-        #     else:
-        #         labels.append(labels.labels_to_id['O'])
-        
-        # output['labels'] = torch.tensor(labels)
+        # if the training sample has no tags that we need, we just produce a 0s list
+        if target_tag not in [labels['tag'] for labels in labels_text]:
+            labels = [0] * len(tokens)
+        # if the training sample has tags we need, we first exclude the label lists whose tags don't match
+        # and then we merge the label lists that have tags that match the target tag
+        else:
+            labels = [max(values) for values in zip(*[labels['labels'] for labels in labels_text if labels['tag'] == target_tag])]
+        samples_new.append({
+            'id': i,
+            'ner_tags': labels,
+            'tokens': tokens,
+        })
+    return samples_new
 
+from collections import defaultdict
 
-    return samples
+def dict_of_lists(lst_of_dicts):
+    result = defaultdict(list)
+    for d in lst_of_dicts:
+        for key, value in d.items():
+            result[key].append(value)
+    return dict(result)
 
-datadict = datadict.map((lambda x: preprocess(x, tokenizer)), batched=True)
+def tokenize_and_align_labels(examples):
+    examples = dict_of_lists(examples)
+    tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding='longest', return_tensors='pt')
 
+    labels = []
+    for i, label in enumerate(examples[f"ner_tags"]):
+        word_ids = [tokenized_inputs.token_to_word(i, j) for j in range(len(tokenized_inputs['input_ids'][i]))]  # Map tokens to their respective word.
+        previous_word_idx = None
+        label_ids = []
+        for word_idx in word_ids:  # Set the special tokens to -100.
+            if word_idx is None:
+                label_ids.append(-100)
+            elif word_idx != previous_word_idx:  # Only label the first token of a given word.
+                label_ids.append(label[word_idx])
+            else:
+                label_ids.append(-100)
+            previous_word_idx = word_idx
+        labels.append(label_ids)
+
+    tokenized_inputs["labels"] = torch.tensor(labels)
+    return tokenized_inputs
+
+target_tag = 'Loaded_Language'
+
+datadict = datadict.map((lambda x: tokenize_and_align_labels(span_to_words_annotation(x, target_tag=target_tag))), batched=True)
+columns = [
+            'input_ids',
+            'token_type_ids',
+            'attention_mask',
+            'labels'
+            ]
+datadict.set_format('torch', columns = columns)
 train_data = datadict['train']
 val_data = datadict['test']
 
-labels = LabelSet(labels=df_pos['annotations'].apply(lambda x: x[0]['tag']).tolist())
+from transformers import DataCollatorForTokenClassification 
 
-train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_data, batch_size=64, shuffle=False)
+data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
+
+train_loader = DataLoader(train_data, batch_size=64, shuffle=True, collate_fn=data_collator)
+val_loader = DataLoader(val_data, batch_size=64, shuffle=False, collate_fn=data_collator)
 
 model = AutoModelForTokenClassification.from_pretrained(model_name,
-                                                        num_labels=len(train_data),
-                                                        label2id=labels.labels_to_id,
-                                                        id2label=labels.ids_to_label,
+                                                        num_labels=len(labels_model.ids_to_label.values()),
+                                                        label2id=labels_model.labels_to_id,
+                                                        id2label=labels_model.ids_to_label,
                                                         )
 lr = 5e-5
 optimizer = AdamW(model.parameters(), lr=lr)
@@ -153,7 +202,7 @@ def evaluate():
     for i, batch in enumerate(progbar_val):
         with torch.no_grad():
             input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_masks'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
             labels = batch['labels'].to(device)
 
             outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
@@ -182,7 +231,7 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         inputs = {
         'input_ids': batch['input_ids'].to(device),
-        'attention_mask': batch['attention_masks'].to(device),
+        'attention_mask': batch['attention_mask'].to(device),
         'labels': batch['labels'].to(device),
         }
 
@@ -201,7 +250,7 @@ for epoch in range(epochs):
     print(results)
 
 models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models'
-model_save_name = f'{model_name_simple}_ME{epochs}_{date_time}'
+model_save_name = f'{model_name_simple}_ME{epochs}_target={target_tag}_{date_time}'
 model_save_dir = os.path.join(models_dir, model_save_name)
 save_local_model(model_save_dir, model, tokenizer)
 
@@ -224,24 +273,3 @@ info = {
 
 with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:
     json.dump(info, f, ensure_ascii = False)
-
-
-
-# checklist = ['.', '...', '\n\n']
-# for sample in dataset:#datadict['train']:
-#     for annotation in sample['annotations']:
-#         start = annotation['start']
-#         end = annotation['end']
-#         text = sample['text']
-#         # text = re.sub(r'\n+', ' ', text)
-#         slice = text[start:end+1]
-#         print('--------------')
-#         print('left:', text[:start][-20:])
-#         print('>>> slice:', slice)
-#         print('right:', text[end+1:][:20])
-#         print('--------------')
-
-        # for char in checklist:
-        #     if char in slice and slice[-1] != '.':
-        #         print(text[start:end])
-        #         print('------------')
