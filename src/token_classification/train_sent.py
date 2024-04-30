@@ -51,14 +51,18 @@ mappings = [
     {'pattern': r'\s+', 'target': ' '},
     ]
 
-def sub_shift_spans(text, ents, mappings = [], diacritics = 'àèìòùáéíóúÀÈÌÒÙÁÉÍÓÚ'):
+import unicodedata
+import copy
+
+def sub_shift_spans(text, ents, mappings = []):
+    original = copy.deepcopy(text)
     for mapping in mappings:
         adjustment = 0
         pattern = re.compile(mapping['pattern'])
         for match in re.finditer(pattern, text):
             match_index = match.start() + adjustment
             match_contents = match.group()
-            if match_contents not in diacritics:
+            if all(unicodedata.category(char).startswith('P') for char in match_contents):
                 subbed_text = mapping['target'].replace('placeholder', match_contents)
             else:
                 subbed_text = match_contents
@@ -177,8 +181,8 @@ from transformers import DataCollatorForTokenClassification
 
 data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
 
-train_loader = DataLoader(train_data, batch_size=64, shuffle=True, collate_fn=data_collator)
-val_loader = DataLoader(val_data, batch_size=64, shuffle=False, collate_fn=data_collator)
+train_loader = DataLoader(train_data, batch_size=16, shuffle=True, collate_fn=data_collator)
+val_loader = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=data_collator)
 
 model = AutoModelForTokenClassification.from_pretrained(model_name,
                                                         num_labels=len(labels_model.ids_to_label.values()),
