@@ -167,7 +167,7 @@ def tokenize_and_align_labels(examples):
 
 target_tags = [(i, el.strip()) for i, el in enumerate(open('/home/pgajo/checkthat24/checkthat24_DIT/persuasion_techniques.txt').readlines())]
 
-for tt in target_tags:
+for tt in target_tags[:3]:
 
     datadict = datadict.map((lambda x: tokenize_and_align_labels(span_to_words_annotation(x, target_tag=tt[1]))), batched=True)
 
