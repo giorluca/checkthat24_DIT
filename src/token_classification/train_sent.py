@@ -38,6 +38,7 @@ df = pd.concat([
 ic(len(df_pos))
 ic(len(df_neg))
 ic(len(df))
+
 dataset = Dataset.from_pandas(df[['lang', 'annotations', 'text', 'article_id']]).filter(lambda example: example["text"] is not None) # some samples have no text and cannot be tokenized so we filter them out
 # dataset = dataset.filter(lambda example: example['lang'] == 'en')
 split_ratio = 0.2
@@ -88,9 +89,9 @@ def sub_shift_spans(text, ents, mappings = []):
     #     ic(text[ent['start']:ent['end']])
     return text, ents
 
-model_name = 'bert-base-multilingual-cased'
+# model_name = 'bert-base-multilingual-cased'
 # model_name = 'xlm-roberta-base'
-# model_name = 'microsoft/mdeberta-v3-base'
+model_name = 'microsoft/mdeberta-v3-base'
 model_name_simple = model_name.split('/')[-1]
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -164,116 +165,121 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = torch.tensor(labels)
     return tokenized_inputs
 
-target_tag = 'Loaded_Language'
+target_tags = [(i, el.strip()) for i, el in enumerate(open('/home/pgajo/checkthat24/checkthat24_DIT/persuasion_techniques.txt').readlines())]
 
-datadict = datadict.map((lambda x: tokenize_and_align_labels(span_to_words_annotation(x, target_tag=target_tag))), batched=True)
-columns = [
-            'input_ids',
-            'token_type_ids',
-            'attention_mask',
-            'labels'
-            ]
-datadict.set_format('torch', columns = columns)
-train_data = datadict['train']
-val_data = datadict['test']
+for tt in target_tags:
 
-from transformers import DataCollatorForTokenClassification 
+    datadict = datadict.map((lambda x: tokenize_and_align_labels(span_to_words_annotation(x, target_tag=tt[1]))), batched=True)
 
-data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
+    columns = [
+                'input_ids',
+                'token_type_ids',
+                'attention_mask',
+                'labels'
+                ]
+    
+    datadict.set_format('torch', columns = columns)
 
-train_loader = DataLoader(train_data, batch_size=16, shuffle=True, collate_fn=data_collator)
-val_loader = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=data_collator)
+    train_data = datadict['train']
+    val_data = datadict['test']
 
-model = AutoModelForTokenClassification.from_pretrained(model_name,
-                                                        num_labels=len(labels_model.ids_to_label.values()),
-                                                        label2id=labels_model.labels_to_id,
-                                                        id2label=labels_model.ids_to_label,
-                                                        )
-lr = 5e-5
-optimizer = AdamW(model.parameters(), lr=lr)
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-epochs = 3
+    from transformers import DataCollatorForTokenClassification 
 
-model.to(device)
+    data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
 
-def evaluate():
-    model.eval()
-    eval_loss = 0
-    preds = []
-    out_label_ids = []
+    train_loader = DataLoader(train_data, batch_size=16, shuffle=True, collate_fn=data_collator)
+    val_loader = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=data_collator)
 
-    progbar_val = tqdm(val_loader)
-    for i, batch in enumerate(progbar_val):
-        with torch.no_grad():
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['labels'].to(device)
+    model = AutoModelForTokenClassification.from_pretrained(model_name,
+                                                            num_labels=len(labels_model.ids_to_label.values()),
+                                                            label2id=labels_model.labels_to_id,
+                                                            id2label=labels_model.ids_to_label,
+                                                            )
+    lr = 5e-5
+    optimizer = AdamW(model.parameters(), lr=lr)
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    epochs = 3
 
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+    model.to(device)
+
+    def evaluate():
+        model.eval()
+        eval_loss = 0
+        preds = []
+        out_label_ids = []
+
+        progbar_val = tqdm(val_loader)
+        for i, batch in enumerate(progbar_val):
+            with torch.no_grad():
+                input_ids = batch['input_ids'].to(device)
+                attention_mask = batch['attention_mask'].to(device)
+                labels = batch['labels'].to(device)
+
+                outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+
+                loss = outputs.loss
+                eval_loss += loss.item()
+
+                preds.extend(np.argmax(outputs['logits'].detach().cpu().numpy(), axis=2).flatten())
+                out_label_ids.extend(labels.detach().cpu().numpy().flatten())
+
+                val_loss_tmp = round(eval_loss / (i + 1), 4)
+                progbar_val.set_postfix({'Eval loss':val_loss_tmp})
+
+        preds = np.array(preds)
+        out_label_ids = np.array(out_label_ids)
+
+        results = classification_report(out_label_ids, preds, output_dict=True)
+
+        return results
+
+    for epoch in range(epochs):
+        model.train()
+        train_loss = 0
+        progbar_train = tqdm(train_loader)
+        for i, batch in enumerate(progbar_train):
+            optimizer.zero_grad()
+            inputs = {
+            'input_ids': batch['input_ids'].to(device),
+            'attention_mask': batch['attention_mask'].to(device),
+            'labels': batch['labels'].to(device),
+            }
+
+            outputs = model(**inputs)
 
             loss = outputs.loss
-            eval_loss += loss.item()
+            loss.backward()
+            train_loss += loss.item()
+            
+            optimizer.step()
 
-            preds.extend(np.argmax(outputs['logits'].detach().cpu().numpy(), axis=2).flatten())
-            out_label_ids.extend(labels.detach().cpu().numpy().flatten())
+            train_loss_tmp = round(train_loss / (i + 1), 4)
+            progbar_train.set_postfix({'Train loss':train_loss_tmp})
 
-            val_loss_tmp = round(eval_loss / (i + 1), 4)
-            progbar_val.set_postfix({'Eval loss':val_loss_tmp})
+        results = evaluate()
+        print(results)
 
-    preds = np.array(preds)
-    out_label_ids = np.array(out_label_ids)
+    models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models'
+    model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_{date_time}'
+    model_save_dir = os.path.join(models_dir, model_save_name)
+    save_local_model(model_save_dir, model, tokenizer)
 
-    results = classification_report(out_label_ids, preds, output_dict=True)
+    results['train_data_path'] = train_data_path
 
-    return results
+    with open(os.path.join(model_save_dir, 'results.json'), 'w', encoding='utf8') as f:
+        json.dump(results, f, ensure_ascii = False)
 
-for epoch in range(epochs):
-    model.train()
-    train_loss = 0
-    progbar_train = tqdm(train_loader)
-    for i, batch in enumerate(progbar_train):
-        optimizer.zero_grad()
-        inputs = {
-        'input_ids': batch['input_ids'].to(device),
-        'attention_mask': batch['attention_mask'].to(device),
-        'labels': batch['labels'].to(device),
-        }
+    info = {
+        'model_name': model_name,
+        'epochs': epochs,
+        'lr': lr,
+        'len(train_data)': len(train_data),
+        'len(val_data)': len(val_data),
+        'split_ratio': split_ratio,
+        'split_seed': split_seed,
+        'train_data_path': train_data_path,
 
-        outputs = model(**inputs)
+    }
 
-        loss = outputs.loss
-        loss.backward()
-        train_loss += loss.item()
-        
-        optimizer.step()
-
-        train_loss_tmp = round(train_loss / (i + 1), 4)
-        progbar_train.set_postfix({'Train loss':train_loss_tmp})
-
-    results = evaluate()
-    print(results)
-
-models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models'
-model_save_name = f'{model_name_simple}_ME{epochs}_target={target_tag}_{date_time}'
-model_save_dir = os.path.join(models_dir, model_save_name)
-save_local_model(model_save_dir, model, tokenizer)
-
-results['train_data_path'] = train_data_path
-
-with open(os.path.join(model_save_dir, 'results.json'), 'w', encoding='utf8') as f:
-    json.dump(results, f, ensure_ascii = False)
-
-info = {
-    'model_name': model_name,
-    'epochs': epochs,
-    'lr': lr,
-    'len(train_data)': len(train_data),
-    'len(val_data)': len(val_data),
-    'split_ratio': split_ratio,
-    'split_seed': split_seed,
-    'train_data_path': train_data_path,
-
-}
-
-with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:
-    json.dump(info, f, ensure_ascii = False)
+    with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:
+        json.dump(info, f, ensure_ascii = False)
