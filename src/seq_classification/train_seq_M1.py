@@ -154,7 +154,7 @@ for epoch in range(epochs):
     results = evaluate()
     print(results)
 
-'''models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models/classification'
+models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models/M1'
 if not os.path.exists(models_dir):
     os.makedirs(models_dir)
 model_save_name = f'{model_name_simple}_ME{epochs}_{date_time}'
@@ -180,4 +180,3 @@ info = {
 
 with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:
     json.dump(info, f, ensure_ascii = False)
-'''

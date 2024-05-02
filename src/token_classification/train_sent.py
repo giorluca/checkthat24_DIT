@@ -5,146 +5,19 @@ from torch.utils.data import DataLoader
 import torch
 from torch.optim import AdamW
 from tqdm import tqdm
-from sklearn.metrics import classification_report
 import numpy as np
 from datasets import Dataset as Dataset
 import pandas as pd
 import os
 import sys
 sys.path.append('/home/pgajo/food/src')
-from utils_food import save_local_model
+from utils_food import save_local_model, sub_shift_spans
 from icecream import ic
 import re
 from datetime import datetime
 date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-# train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold.json'
-train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json'
-
-with open(train_data_path, 'r', encoding='utf8') as f:
-    dataset_raw = json.load(f)
-
-df_raw = pd.DataFrame(dataset_raw)  
-
-df_pos = df_raw[df_raw['annotations'].apply(lambda x: len(x) > 0)]
-ic(df_pos)
-df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_pos))
-ic(df_neg)
-df = pd.concat([
-    df_pos,
-    df_neg
-    ]
-    )
-ic(len(df_pos))
-ic(len(df_neg))
-ic(len(df))
-
-dataset = Dataset.from_pandas(df[['lang', 'annotations', 'text', 'article_id']]).filter(lambda example: example["text"] is not None) # some samples have no text and cannot be tokenized so we filter them out
-# dataset = dataset.filter(lambda example: example['lang'] == 'en')
-split_ratio = 0.2
-split_seed = 42
-datadict = dataset.train_test_split(split_ratio, seed=split_seed)
-
-labels_model = LabelSet(labels=set(df_pos['annotations'].apply(lambda x: x[0]['tag']).tolist()))
-
-mappings = [
-    {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
-    {'pattern': r'\s+', 'target': ' '},
-    ]
-
-import unicodedata
-import copy
-
-def sub_shift_spans(text, ents, mappings = []):
-    original = copy.deepcopy(text)
-    for mapping in mappings:
-        adjustment = 0
-        pattern = re.compile(mapping['pattern'])
-        for match in re.finditer(pattern, text):
-            match_index = match.start() + adjustment
-            match_contents = match.group()
-            if all(unicodedata.category(char).startswith('P') for char in match_contents):
-                subbed_text = mapping['target'].replace('placeholder', match_contents)
-            else:
-                subbed_text = match_contents
-            len_diff = len(subbed_text) - len(match_contents)
-            text = text[:match_index] + subbed_text + text[match_index + len(match_contents):]
-
-            if isinstance(ents, list):
-                for ent in ents:
-                    if ent['start'] <= match_index and ent['end'] > match_index:
-                        ent['end'] += len_diff
-                    if ent['start'] > match_index:
-                        ent['start'] += len_diff
-                        ent['end'] += len_diff
-            elif isinstance(ents, dict):
-                if ents['start'] <= match_index and ents['end'] > match_index:
-                    ents['end'] += len_diff
-                if ents['start'] > match_index:
-                    ents['start'] += len_diff
-                    ents['end'] += len_diff
-
-            adjustment += len_diff
-    # for ent in ent_list:
-    #     ic(text[ent['start']:ent['end']])
-    return text, ents
-
-# model_name = 'bert-base-multilingual-cased'
-# model_name = 'xlm-roberta-base'
-model_name = 'microsoft/mdeberta-v3-base'
-model_name_simple = model_name.split('/')[-1]
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-def span_to_words_annotation(samples, target_tag = ''):
-    samples_new = []
-    for i, (text, annotation_list) in enumerate(zip(samples['text'], samples['annotations'])):
-        labels_text = []
-        tokens = []
-        for j, annotation in enumerate(annotation_list):
-            text_subshifted, ents = sub_shift_spans(text, annotation, mappings=mappings)
-            text_subshifted_matches = re.finditer(r'[^\s]+', text_subshifted)
-            labels_words = []
-            first = 1
-            for k, match in enumerate(text_subshifted_matches):
-                if j == 0:
-                    tokens.append(match.group())
-                if match.start() < ents['start']:
-                    labels_words.append(labels_model.labels_to_id['O'])
-                elif match.start() >= ents['start'] and match.end() <= ents['end']:
-                    if first == 1:
-                        labels_words.append(labels_model.labels_to_id['B-' + ents['tag']])
-                        first = 0
-                    elif first == 0:
-                        labels_words.append(labels_model.labels_to_id['I-' + ents['tag']])
-                else:
-                    labels_words.append(labels_model.labels_to_id['O'])
-            labels_text.append({'labels': labels_words, 'tag': annotation['tag']})
-
-        # if the training sample has no tags that we need, we just produce a 0s list
-        if target_tag not in [labels['tag'] for labels in labels_text]:
-            labels = [0] * len(tokens)
-        # if the training sample has tags we need, we first exclude the label lists whose tags don't match
-        # and then we merge the label lists that have tags that match the target tag
-        else:
-            labels = [max(values) for values in zip(*[labels['labels'] for labels in labels_text if labels['tag'] == target_tag])]
-        samples_new.append({
-            'id': i,
-            'ner_tags': labels,
-            'tokens': tokens,
-        })
-    return samples_new
-
-from collections import defaultdict
-
-def dict_of_lists(lst_of_dicts):
-    result = defaultdict(list)
-    for d in lst_of_dicts:
-        for key, value in d.items():
-            result[key].append(value)
-    return dict(result)
-
 def tokenize_and_align_labels(examples):
-    examples = dict_of_lists(examples)
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding='longest', return_tensors='pt')
 
     labels = []
@@ -165,11 +38,204 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = torch.tensor(labels)
     return tokenized_inputs
 
+mappings = [
+    {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
+    {'pattern': r'\s+', 'target': ' '},
+    ]
+
+from collections import defaultdict
+
+def dict_of_lists(lst_of_dicts):
+    result = defaultdict(list)
+    for d in lst_of_dicts:
+        for key, value in d.items():
+            result[key].append(value)
+    return dict(result)
+
+def span_to_words_annotation(samples, target_tag = '', mappings = {}, labels_model = []):
+    samples_new = []
+    for i, (text, annotation_list) in enumerate(zip(samples['text'], samples['annotations'])):
+        labels_text = []
+        tokens = []
+        for j, annotation in enumerate(annotation_list):
+            if annotation['tag'] != target_tag:
+                continue
+            text_subshifted, ents = sub_shift_spans(text, annotation, mappings=mappings)
+            text_subshifted_matches = re.finditer(r'[^\s]+', text_subshifted)
+            labels_words = []
+            first = 1
+            for k, match in enumerate(text_subshifted_matches):
+                if j == 0:
+                    tokens.append(match.group())
+                if match.start() < ents['start']:
+                    labels_words.append(labels_model.labels_to_id['O'])
+                elif match.start() >= ents['start'] and match.end() <= ents['end']:
+                    if first == 1:
+                        labels_words.append(labels_model.labels_to_id['B-' + ents['tag']])
+                        first = 0
+                    elif first == 0:
+                        labels_words.append(labels_model.labels_to_id['I-' + ents['tag']])
+                else:
+                    labels_words.append(labels_model.labels_to_id['O'])
+            labels_text.append({'labels': labels_words, 'tag': annotation['tag']})
+        allowed_labels = [labels_model.labels_to_id['O'],
+                          labels_model.labels_to_id['B-' + target_tag],
+                          labels_model.labels_to_id['I-' + target_tag],
+                          ]
+        # if the training sample has no tags that we need, we just produce a 0s list
+        if target_tag not in [labels['tag'] for labels in labels_text]:
+            labels = [0] * len(tokens)
+            tag = 'no_tag'
+        # if the training sample has tags we need, we first exclude the label lists whose tags don't match
+        # and then we merge the label lists that have tags that match the target tag
+        else:
+            labels = [max(values) for values in zip(*[labels['labels'] for labels in labels_text if labels['tag'] == target_tag])]
+            labels = [(label if label in allowed_labels else 0) for label in labels]
+            tag = target_tag
+        samples_new.append({
+            'id': i,
+            'ner_tags': labels,
+            'tokens': tokens,
+            'tag': tag,
+        })
+    # samples_new = dict_of_lists(samples_new)
+    return samples_new
+
+import evaluate
+
+# seqeval = evaluate.load("seqeval")
+from sklearn.metrics import f1_score
+from collections import Counter
+from seqeval.metrics import classification_report
+
+def compute_metrics(predictions, labels, label_list):
+    predictions = np.argmax(predictions, axis=2)
+
+    # Extract the true predictions and labels from the sequences
+    true_predictions = [
+        [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
+    true_labels = [
+        [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+        for prediction, label in zip(predictions, labels)
+    ]
+
+    # Compute sequence-level evaluation metrics
+    results = classification_report(true_predictions, true_labels, output_dict=True)
+
+    # Flatten the lists to calculate micro F1-score and supports
+    flat_true_predictions = [item for sublist in true_predictions for item in sublist]
+    flat_true_labels = [item for sublist in true_labels for item in sublist]
+
+    # Calculate micro F1-score using sklearn
+    micro_f1 = f1_score(flat_true_labels, flat_true_predictions, average='micro')
+
+    # Prepare the results dictionary
+    flat_results = {'micro_f1': float(micro_f1)}
+
+    # Add detailed metrics for each label to the results dictionary
+    for label, metrics in results.items():
+        if isinstance(metrics, dict):
+            for metric, value in metrics.items():
+                flat_results[f'{label}_{metric}'] = float(value)
+
+    # Compute support for each label using Counter
+    label_support = Counter(flat_true_labels)
+    for label, count in label_support.items():
+        flat_results[f'{label}_support'] = count
+
+    return flat_results
+
+
+def evaluate(model, val_loader, label_list, device):
+    model.eval()
+    eval_loss = 0
+    preds_list = []
+    golds_list = []
+
+    progbar_val = tqdm(val_loader)
+    for i, batch in enumerate(progbar_val):
+        with torch.no_grad():
+            inputs = {
+                'input_ids': batch['input_ids'].to(device),
+                'token_type_ids': batch['token_type_ids'].to(device),
+                'attention_mask': batch['attention_mask'].to(device),
+                'labels': batch['labels'].to(device),
+            }
+
+            outputs = model(**inputs)
+            loss = outputs.loss
+            eval_loss += loss.item()
+
+            preds_list.append(outputs['logits'].detach().cpu().numpy())
+            golds_list.append(inputs['labels'].detach().cpu().numpy())
+
+            val_loss_tmp = round(eval_loss / (i + 1), 4)
+            progbar_val.set_postfix({'Eval loss': val_loss_tmp})
+
+    # Convert lists to numpy arrays after collecting all the data
+    preds = np.vstack(preds_list)
+    golds = np.vstack(golds_list)
+
+    results = compute_metrics(preds, golds, label_list)
+
+    return results
+    
+train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json'
+
+with open(train_data_path, 'r', encoding='utf8') as f:
+    dataset_raw = json.load(f)
+
+df_raw = pd.DataFrame(dataset_raw)  
+
+df_pos = df_raw[df_raw['annotations'].apply(lambda x: len(x) > 0)]
+ic(df_pos)
+df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_pos))
+ic(df_neg)
+df = pd.concat([
+    df_pos,
+    df_neg
+    ]
+    )
+ic(len(df_pos))
+ic(len(df_neg))
+ic(len(df))
+
 target_tags = [(i, el.strip()) for i, el in enumerate(open('/home/pgajo/checkthat24/checkthat24_DIT/persuasion_techniques.txt').readlines())]
+shift = 0
+for i, tt in enumerate(target_tags):
+    print(f'Training model no. {i} of {len(target_tags)} for {tt} persuasion technique...')
+    if i < shift:
+        continue
+    labels_model = LabelSet(labels=[tt[1]])
+    
+    df_list = df.to_dict(orient='records')
+    df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=tt[1], mappings=mappings, labels_model=labels_model)
+    df_binary = pd.DataFrame(df_list_binary)
+    ic(df_binary['tag'].value_counts())
+    df_binary_pos = df_binary[df_binary['tag'] == tt[1]]
+    df_binary_neg = df_binary[df_binary['tag'] != tt[1]].sample(len(df_binary_pos))
 
-for tt in target_tags[:3]:
+    df_binary_subsampled = pd.concat([df_binary_pos, df_binary_neg])#.sample(1000)
+    ic(df_binary_subsampled['tag'].value_counts())
 
-    datadict = datadict.map((lambda x: tokenize_and_align_labels(span_to_words_annotation(x, target_tag=tt[1]))), batched=True)
+    binary_dataset = Dataset.from_pandas(df_binary_subsampled[['id', 'ner_tags', 'tokens']])#.filter(lambda example: example["text"] is not None)
+    # some samples have no text and cannot be tokenized so we filter them out
+    
+    # binary_dataset = dataset.map((lambda x: span_to_words_annotation(x, target_tag=tt[1], mappings=mappings, labels_model=labels_model)), batched=True)
+
+    split_ratio = 0.2
+    split_seed = 42
+    datadict = binary_dataset.train_test_split(split_ratio, seed=split_seed)
+
+    # model_name = 'bert-base-multilingual-cased'
+    # model_name = 'xlm-roberta-base'
+    model_name = 'microsoft/mdeberta-v3-base'
+    model_name_simple = model_name.split('/')[-1]
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    datadict = datadict.map(tokenize_and_align_labels, batched=True, batch_size=None)
 
     columns = [
                 'input_ids',
@@ -177,10 +243,10 @@ for tt in target_tags[:3]:
                 'attention_mask',
                 'labels'
                 ]
-    
+
     datadict.set_format('torch', columns = columns)
 
-    train_data = datadict['train']
+    train_data = datadict['train']#.select(range(100))
     val_data = datadict['test']
 
     from transformers import DataCollatorForTokenClassification 
@@ -202,37 +268,6 @@ for tt in target_tags[:3]:
 
     model.to(device)
 
-    def evaluate():
-        model.eval()
-        eval_loss = 0
-        preds = []
-        out_label_ids = []
-
-        progbar_val = tqdm(val_loader)
-        for i, batch in enumerate(progbar_val):
-            with torch.no_grad():
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                labels = batch['labels'].to(device)
-
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-
-                loss = outputs.loss
-                eval_loss += loss.item()
-
-                preds.extend(np.argmax(outputs['logits'].detach().cpu().numpy(), axis=2).flatten())
-                out_label_ids.extend(labels.detach().cpu().numpy().flatten())
-
-                val_loss_tmp = round(eval_loss / (i + 1), 4)
-                progbar_val.set_postfix({'Eval loss':val_loss_tmp})
-
-        preds = np.array(preds)
-        out_label_ids = np.array(out_label_ids)
-
-        results = classification_report(out_label_ids, preds, output_dict=True)
-
-        return results
-
     for epoch in range(epochs):
         model.train()
         train_loss = 0
@@ -241,6 +276,7 @@ for tt in target_tags[:3]:
             optimizer.zero_grad()
             inputs = {
             'input_ids': batch['input_ids'].to(device),
+            'token_type_ids': batch['token_type_ids'].to(device),
             'attention_mask': batch['attention_mask'].to(device),
             'labels': batch['labels'].to(device),
             }
@@ -256,18 +292,20 @@ for tt in target_tags[:3]:
             train_loss_tmp = round(train_loss / (i + 1), 4)
             progbar_train.set_postfix({'Train loss':train_loss_tmp})
 
-        results = evaluate()
-        print(results)
+        final_results = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device)
+        print(final_results)
 
-    models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models'
-    model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_{date_time}'
+    models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models/M2'
+    model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_SUBSAMPLED_{date_time}'
     model_save_dir = os.path.join(models_dir, model_save_name)
     save_local_model(model_save_dir, model, tokenizer)
 
-    results['train_data_path'] = train_data_path
+    final_results['train_data_path'] = train_data_path  
+    ic(type(final_results))
+    ic(final_results)
 
     with open(os.path.join(model_save_dir, 'results.json'), 'w', encoding='utf8') as f:
-        json.dump(results, f, ensure_ascii = False)
+        json.dump(dict(final_results), f, ensure_ascii = False)
 
     info = {
         'model_name': model_name,
@@ -278,7 +316,6 @@ for tt in target_tags[:3]:
         'split_ratio': split_ratio,
         'split_seed': split_seed,
         'train_data_path': train_data_path,
-
     }
 
     with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:

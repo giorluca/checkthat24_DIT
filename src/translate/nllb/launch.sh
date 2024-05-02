@@ -12,7 +12,7 @@ eval "$(conda shell.bash hook)"
 conda activate checkthat
 
 declare -a tgt_languages=(
-# 'ita_Latn'
+'ita_Latn'
 'rus_Cyrl'
 'spa_Latn'
 'arb_Arab'
