@@ -1,12 +1,12 @@
 import re
 import json
 
-def text_to_sentence_dataset(data):
+def text_to_sentence_dataset(data, suffix = ''):
     # List to store dictionaries representing sentences with metadata
     sentence_data = []
     for sample in data:
         # Tokenize the text into sentences
-        text = sample['text'].replace('\n', '\n ')
+        text = sample['text']#.replace('\n', '\n ')
         sentences = re.findall(r'[^.!?]*[.!?]', text)
 
         for sentence in sentences:
@@ -17,8 +17,8 @@ def text_to_sentence_dataset(data):
             # Adjust spans to sentence-level
             adjusted_sentence_spans = []
             for anno in sample['annotations']:
-                span_start = anno['start']
-                span_end = anno['end']
+                span_start = anno[f'start{suffix}']
+                span_end = anno[f'end{suffix}']
                 if span_start >= start_index and span_end <= end_index:
                     adjusted_start = span_start - start_index
                     adjusted_end = span_end - start_index + 1
@@ -49,11 +49,12 @@ def text_to_sentence_dataset(data):
     return sentence_data
 
 def main():
-    data = json.load(open('/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold.json', 'r', encoding='utf8'))
-    sentence_data = text_to_sentence_dataset(data)
+    suffix = '_shifted'
+    data = json.load(open(f'/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold{suffix}.json', 'r', encoding='utf8'))
+    sentence_data = text_to_sentence_dataset(data, suffix = suffix)
 
-    with open("/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences_new.json", "w", encoding='utf-8') as outfile: 
+    with open(f'/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences{suffix}.json', 'w', encoding='utf-8') as outfile: 
         json.dump(sentence_data, outfile, ensure_ascii = False)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

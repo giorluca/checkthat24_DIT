@@ -28,12 +28,12 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
 
-    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl.json'
-    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json'
-    json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
-    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn.json'
-    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl.json'
-    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn.json'
+    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted/train_gold_sentences_shifted_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl.json'
+    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted/train_gold_sentences_shifted_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json'
+    json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted/train_gold_sentences_shifted_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
+    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted/train_gold_sentences_shifted_translated_nllb-200-3.3B_eng_Latn-por_Latn.json'
+    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted/train_gold_sentences_shifted_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl.json'
+    # json_path_unaligned = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted/train_gold_sentences_shifted_translated_nllb-200-3.3B_eng_Latn-slv_Latn.json'
 
     with open(json_path_unaligned, 'r', encoding='utf8') as f:
         data = json.load(f)
@@ -95,9 +95,9 @@ def main():
             new_annotation = {'start': min(start_list), 'end': max(end_list), 'tag': entity['tag']}
             new_annotation_list.append(new_annotation)
             progbar.set_description(f'Entities: {num_ents} - Errors: {num_errors} - Err%: {round((num_errors/num_ents)*100, 2)}')
-            # ic(new_sample['text_src'][entity['start']:entity['end']])
-            # ic(new_sample['text_tgt'][new_annotation['start']:new_annotation['end']])
-            # print('##########################################')
+            ic(new_sample['text_src'][entity['start']:entity['end']])
+            ic(new_sample['text_tgt'][new_annotation['start']:new_annotation['end']])
+            print('##########################################')
         new_sample.update({'annotations': new_annotation_list})
         aligned_dataset.append(new_sample)
 

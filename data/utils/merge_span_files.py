@@ -4,13 +4,13 @@ import json
 
 main_dir = '/home/pgajo/checkthat24/checkthat24_DIT/data/raw'
 suffix = ''
-for root, dir, files in os.walk(main_dir):
+for root, dirs, files in os.walk(main_dir):
     if root.endswith('spans'):
-        filename_merged = f'{root}_{suffix}.json'
-        filename_merged_content = ''
+        filename_merged = f'{root}{suffix}.json'
         with open(filename_merged, 'w', encoding='utf8') as merged_file:
             data = {}
-            for file in os.listdir(root):
+            sorted_files = sorted(os.listdir(root))
+            for file in sorted_files:
                 article_id = re.search(r'article(\d+)-labels-subtask-3', file).group(1)
                 filename = os.path.join(root, file)
                 new_content = open(filename, 'r', encoding='utf8').readlines()

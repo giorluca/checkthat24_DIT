@@ -16,7 +16,7 @@ from datetime import datetime
 date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 from icecream import ic
 
-train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json'
+train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences_mine.json'
 
 with open(train_data_path, 'r', encoding='utf8') as f:
     dataset_raw = json.load(f)
