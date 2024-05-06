@@ -203,11 +203,8 @@ ic(len(df_neg))
 ic(len(df))
 
 target_tags = [(i, el.strip()) for i, el in enumerate(open('/home/pgajo/checkthat24/checkthat24_DIT/persuasion_techniques.txt').readlines())]
-shift = 0
 for i, tt in enumerate(target_tags):
     print(f'Training model no. {i} of {len(target_tags)} for {tt} persuasion technique...')
-    if i < shift:
-        continue
     labels_model = LabelSet(labels=[tt[1]])
     
     df_list = df.to_dict(orient='records')
@@ -216,7 +213,8 @@ for i, tt in enumerate(target_tags):
     ic(df_binary['tag'].value_counts())
     df_binary_pos = df_binary[df_binary['tag'] == tt[1]]
     df_binary_neg = df_binary[df_binary['tag'] != tt[1]].sample(len(df_binary_pos))
-
+    ic(df_binary_pos['tag'].value_counts())
+    ic(df_binary_neg['tag'].value_counts())
     df_binary_subsampled = pd.concat([df_binary_pos, df_binary_neg])#.sample(1000)
     ic(df_binary_subsampled['tag'].value_counts())
 

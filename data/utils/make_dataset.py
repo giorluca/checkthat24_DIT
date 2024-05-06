@@ -50,7 +50,7 @@ for lang in os.listdir(main_folder):
                             entry['annotations'] = label_data[article_id]
                         entry['article_id'] = article_id
                         entry['lang'] = lang
-                        entry['text'] = text.replace('\n', '\n ')
+                        entry['text'] = text#.replace('\n', '\n ')
                     except UnicodeDecodeError:
                         continue
                 entry = fix_entry(entry)

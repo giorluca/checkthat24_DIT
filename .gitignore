@@ -1,4 +1,6 @@
-models/
+# models/
+/models/**/*.*
+!/models/**/results.json
 # data/
 # *.json
 *.pyc
