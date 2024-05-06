@@ -2,8 +2,8 @@ import os
 import re
 import json
 
-main_dir = '/home/pgajo/checkthat24/checkthat24_DIT/data/raw_mine'
-suffix = 'binary'
+main_dir = '/home/pgajo/checkthat24/checkthat24_DIT/data/raw'
+suffix = ''
 for root, dir, files in os.walk(main_dir):
     if root.endswith('spans'):
         filename_merged = f'{root}_{suffix}.json'
