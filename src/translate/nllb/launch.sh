@@ -40,8 +40,8 @@ declare -a tgt_languages=(
 for tgt_language in "${tgt_languages[@]}";
 do
     python /home/pgajo/checkthat24/checkthat24_DIT/src/translate/nllb/translate_sent_nllb_batched.py \
-    --dataset_path /home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences_shifted.json \
-    --train_dir /home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_shifted \
+    --dataset_path /home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences_fixed.json \
+    --train_dir /home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed \
     --model_name facebook/nllb-200-3.3B \
     --src_lang eng_Latn \
     --tgt_lang $tgt_language

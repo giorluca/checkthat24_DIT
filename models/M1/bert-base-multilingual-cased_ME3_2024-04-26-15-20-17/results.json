@@ -1,8 +1,0 @@
-{
-    "0": {"precision": 0.34235229155162894, "recall": 1, "f1-score": 0.5100781571369807, "support": 2480},
-    "1": {"precision": 0, "recall": 0, "f1-score": 0, "support": 4764},
-    "accuracy": 0.34235229155162894,
-    "macro avg": {"precision": 0.17117614577581447, "recall": 0.5, "f1-score": 0.25503907856849034, "support": 7244},
-    "weighted avg": {"precision": 0.11720509153065153, "recall": 0.34235229155162894, "f1-score": 0.1746264259662772, "support": 7244},
-    "train_data_path": "/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json"
-}

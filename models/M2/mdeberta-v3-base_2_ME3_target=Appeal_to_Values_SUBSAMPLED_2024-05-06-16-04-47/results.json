@@ -1,0 +1,23 @@
+{
+    "micro_f1": 0.7387523629489604,
+    "Appeal_to_Values_precision": 0.14457831325301204,
+    "Appeal_to_Values_recall": 0.07947019867549669,
+    "Appeal_to_Values_f1-score": 0.10256410256410257,
+    "Appeal_to_Values_support": 151,
+    "micro avg_precision": 0.14457831325301204,
+    "micro avg_recall": 0.07947019867549669,
+    "micro avg_f1-score": 0.10256410256410257,
+    "micro avg_support": 151,
+    "macro avg_precision": 0.14457831325301204,
+    "macro avg_recall": 0.07947019867549669,
+    "macro avg_f1-score": 0.10256410256410257,
+    "macro avg_support": 151,
+    "weighted avg_precision": 0.14457831325301204,
+    "weighted avg_recall": 0.07947019867549669,
+    "weighted avg_f1-score": 0.10256410256410257,
+    "weighted avg_support": 151,
+    "O_support": 1430,
+    "B-Appeal_to_Values_support": 83,
+    "I-Appeal_to_Values_support": 1132,
+    "train_data_path": "/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json"
+}
