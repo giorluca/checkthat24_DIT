@@ -7,8 +7,8 @@ from tqdm.auto import tqdm
 from evaluate import load
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DataCollatorWithPadding
 import sys
-sys.path.append('/home/pgajo/food/src')
-from utils_food import data_loader, SquadEvaluator, TASTEset, save_local_model
+sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+from utils_checkthat import data_loader, SquadEvaluator, TASTEset, save_local_model
 import re
 from datetime import datetime
 import os

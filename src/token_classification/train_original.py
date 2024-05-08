@@ -14,8 +14,8 @@ from torch.utils.data import Dataset
 import pandas as pd
 import os
 import sys
-sys.path.append('/home/pgajo/food/src')
-from utils_food import save_local_model
+sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+from utils_checkthat import save_local_model
 from icecream import ic
 import re
 from datetime import datetime

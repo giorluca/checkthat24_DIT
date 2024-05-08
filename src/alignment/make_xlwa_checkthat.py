@@ -1,7 +1,7 @@
 import os
 import sys
-sys.path.append('/home/pgajo/food/src')
-from utils_food import XLWADataset
+sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+from utils_checkthat import XLWADataset
 from transformers import AutoTokenizer
 from datasets import concatenate_datasets
 

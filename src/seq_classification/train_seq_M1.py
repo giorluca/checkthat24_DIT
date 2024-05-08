@@ -10,8 +10,8 @@ from datasets import Dataset as Dataset
 import pandas as pd
 import os
 import sys
-sys.path.append('/home/pgajo/food/src')
-from utils_food import save_local_model
+sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+from utils_checkthat import save_local_model
 from datetime import datetime
 date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 from icecream import ic

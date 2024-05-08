@@ -16,12 +16,11 @@ declare -a tgt_languages=(
 
 # in xl-wa
 'ita_Latn'
-# 'spa_Latn'
-# 'bul_Cyrl'
-# 'por_Latn'
-# 'rus_Cyrl'
-# 'slv_Latn'
-
+'spa_Latn'
+'bul_Cyrl'
+'por_Latn'
+'rus_Cyrl'
+'slv_Latn'
 # 'arb_Arab'
 
 # not in xl-wa
@@ -30,11 +29,6 @@ declare -a tgt_languages=(
 # 'pol_Latn'
 # 'deu_Latn'
 # 'fra_Latn'
-
-
-
-
-
 )
 
 for tgt_language in "${tgt_languages[@]}";
