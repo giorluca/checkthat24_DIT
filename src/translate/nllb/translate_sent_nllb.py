@@ -8,9 +8,9 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="translate checkthat task 3 dataset")
-    parser.add_argument("--dataset_path", help="source language", default="/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json")
+    parser.add_argument("--dataset_path", help="source language", default="./data/train_gold/train_gold_sentences.json")
     parser.add_argument("--model_name", help="model huggingface repo name or model dir path", default="facebook/nllb-200-3.3B")
-    parser.add_argument("--train_dir", help="path to translated train data directory", default='/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt')
+    parser.add_argument("--train_dir", help="path to translated train data directory", default='./data/train_sent_mt')
     parser.add_argument("--src_lang", help="source language for dataset filtering", default="eng_Latn")
     parser.add_argument("--tgt_lang", help="target language", default="ita_Latn")
     parser.add_argument('-nv', '--noverbose', action='store_false')

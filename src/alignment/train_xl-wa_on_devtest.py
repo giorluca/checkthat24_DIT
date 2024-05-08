@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 from evaluate import load
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DataCollatorWithPadding
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import data_loader, SquadEvaluator, TASTEset, save_local_model
 import re
 from datetime import datetime
@@ -18,12 +18,12 @@ from datasets import concatenate_datasets
 def main():
     model_name = 'microsoft/mdeberta-v3-base'
     data_paths = [
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-bg/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-bg',
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-es/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-es',
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-it/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-it',
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-pt/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-pt',
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-ru/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-ru',
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-sl/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-sl',
+    './data/alignment/train/en-bg/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-bg',
+    './data/alignment/train/en-es/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-es',
+    './data/alignment/train/en-it/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-it',
+    './data/alignment/train/en-pt/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-pt',
+    './data/alignment/train/en-ru/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-ru',
+    './data/alignment/train/en-sl/DebertaV2TokenizerFast/mdeberta-v3-base/mdeberta_xlwa_en-sl',
     ]
     model_name_simple = model_name.split('/')[-1]
 

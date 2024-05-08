@@ -8,4 +8,4 @@
 #SBATCH --output=./.slurm/%j_output.log
 #SBATCH --error=./.slurm/%j_error.log
 
-python /home/pgajo/checkthat24/checkthat24_DIT/src/token_classification/train_sent.py
+python ./src/token_classification/train_sent.py

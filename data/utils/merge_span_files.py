@@ -2,7 +2,7 @@ import os
 import re
 import json
 
-main_dir = '/home/pgajo/checkthat24/checkthat24_DIT/data/raw'
+main_dir = './data/raw'
 suffix = ''
 for root, dirs, files in os.walk(main_dir):
     if root.endswith('spans'):

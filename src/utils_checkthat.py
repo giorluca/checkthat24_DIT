@@ -1259,3 +1259,47 @@ nllb_lang2code = { # training languages in checkthat
 }
 
 nllb_code2lang = {value: key for key, value in nllb_lang2code.items()}
+
+def text_to_sentence_sample(sample):
+    # Tokenize the text into sentences
+    text = sample['text']#.replace('\n', '\n ')
+    
+    # Updated regex pattern to correctly split sentences and handle ellipses
+    sentences = re.findall(r'[^.!?]*[.!?]{1,3}', text)
+    
+    sentence_sample_list = []
+    current_position = 0
+    
+    for sentence in sentences:
+        # Calculate the start and end indices of the sentence
+        start_index = text.index(sentence, current_position)
+        end_index = start_index + len(sentence)
+        current_position = end_index  # Update position to start search after this sentence
+
+        # Adjust spans to sentence-level
+        adjusted_sentence_spans = []
+        if 'annotations' in sample:
+            for anno in sample['annotations']:
+                span_start = anno['start']
+                span_end = anno['end']
+                if span_start >= start_index and span_end <= end_index:
+                    adjusted_start = span_start - start_index
+                    adjusted_end = span_end - start_index + 1
+                    adjusted_sentence_spans.append({'start': adjusted_start, 'end': adjusted_end, 'tag': anno['tag']})
+
+        # Determine label based on presence of annotations
+        label = 1 if adjusted_sentence_spans else 0
+        
+        # Create a dictionary representing the sentence with metadata
+        sentence_sample = {
+            'text': sentence,
+            'article_id': sample['article_id'],
+            'lang': sample['lang'],
+            'annotations': adjusted_sentence_spans,
+            'label': label,
+            'sent_start': start_index,
+            'sent_end': end_index,
+        }
+        sentence_sample_list.append(sentence_sample)
+
+    return sentence_sample_list

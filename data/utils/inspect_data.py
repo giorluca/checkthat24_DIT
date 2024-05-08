@@ -1,6 +1,6 @@
 import json
 
-json_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_fixed.json'
+json_path = './data/train_gold/train_gold_fixed.json'
 
 with open(json_path, 'r', encoding='utf8') as f:
     data = json.load(f)

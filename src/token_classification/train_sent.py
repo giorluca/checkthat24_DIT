@@ -10,14 +10,18 @@ from datasets import Dataset as Dataset
 import pandas as pd
 import os
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import save_local_model, sub_shift_spans
 from icecream import ic
 import re
 from datetime import datetime
-date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+from collections import defaultdict
+import evaluate
+from sklearn.metrics import f1_score
+from collections import Counter
+from seqeval.metrics import classification_report
 
-def tokenize_and_align_labels(examples):
+def tokenize_and_align_labels(examples, tokenizer):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding='longest', return_tensors='pt')
 
     labels = []
@@ -38,13 +42,6 @@ def tokenize_and_align_labels(examples):
     tokenized_inputs["labels"] = torch.tensor(labels)
     return tokenized_inputs
 
-mappings = [
-    {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
-    {'pattern': r'\s+', 'target': ' '},
-    ]
-
-from collections import defaultdict
-
 def dict_of_lists(lst_of_dicts):
     result = defaultdict(list)
     for d in lst_of_dicts:
@@ -63,17 +60,17 @@ def span_to_words_annotation(samples, target_tag = '', mappings = {}, labels_mod
             text_subshifted, ents = sub_shift_spans(text, annotation, mappings=mappings)
             text_subshifted_matches = re.finditer(r'[^\s]+', text_subshifted)
             labels_words = []
-            first = 1
-            for k, match in enumerate(text_subshifted_matches):
+            first = True
+            for regex_match in text_subshifted_matches:
                 if j == 0:
-                    tokens.append(match.group())
-                if match.start() < ents['start']:
+                    tokens.append(regex_match.group())
+                if regex_match.start() < ents['start']:
                     labels_words.append(labels_model.labels_to_id['O'])
-                elif match.start() >= ents['start'] and match.end() <= ents['end']:
-                    if first == 1:
+                elif regex_match.start() >= ents['start'] and regex_match.end() <= ents['end']:
+                    if first:
                         labels_words.append(labels_model.labels_to_id['B-' + ents['tag']])
-                        first = 0
-                    elif first == 0:
+                        first = False
+                    elif not first:
                         labels_words.append(labels_model.labels_to_id['I-' + ents['tag']])
                 else:
                     labels_words.append(labels_model.labels_to_id['O'])
@@ -98,15 +95,7 @@ def span_to_words_annotation(samples, target_tag = '', mappings = {}, labels_mod
             'tokens': tokens,
             'tag': tag,
         })
-    # samples_new = dict_of_lists(samples_new)
     return samples_new
-
-import evaluate
-
-# seqeval = evaluate.load("seqeval")
-from sklearn.metrics import f1_score
-from collections import Counter
-from seqeval.metrics import classification_report
 
 def compute_metrics(predictions, labels, label_list):
     predictions = np.argmax(predictions, axis=2)
@@ -180,138 +169,142 @@ def evaluate(model, val_loader, label_list, device):
     results = compute_metrics(preds, golds, label_list)
 
     return results
+
+def main():
+    train_data_path = './data/formatted/train_sentences.json'
+    with open(train_data_path, 'r', encoding='utf8') as f:
+        dataset_raw = json.load(f)
+
+    date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    df_raw = pd.DataFrame(dataset_raw)  
+
+    df_pos = df_raw[df_raw['annotations'].apply(lambda x: len(x) > 0)]
+    df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_pos))
+    df = pd.concat([
+        df_pos,
+        df_neg
+        ]
+        )
     
-train_data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json'
-
-with open(train_data_path, 'r', encoding='utf8') as f:
-    dataset_raw = json.load(f)
-
-df_raw = pd.DataFrame(dataset_raw)  
-
-df_pos = df_raw[df_raw['annotations'].apply(lambda x: len(x) > 0)]
-ic(df_pos)
-df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_pos))
-ic(df_neg)
-df = pd.concat([
-    df_pos,
-    df_neg
-    ]
-    )
-ic(len(df_pos))
-ic(len(df_neg))
-ic(len(df))
-
-target_tags = [(i, el.strip()) for i, el in enumerate(open('/home/pgajo/checkthat24/checkthat24_DIT/persuasion_techniques.txt').readlines())]
-for i, tt in enumerate(target_tags):
-    print(f'Training model no. {i} of {len(target_tags)} for {tt} persuasion technique...')
-    labels_model = LabelSet(labels=[tt[1]])
+    mappings = [
+        {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
+        {'pattern': r'\s+', 'target': ' '},
+        ]
     
-    df_list = df.to_dict(orient='records')
-    df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=tt[1], mappings=mappings, labels_model=labels_model)
-    df_binary = pd.DataFrame(df_list_binary)
-    ic(df_binary['tag'].value_counts())
-    df_binary_pos = df_binary[df_binary['tag'] == tt[1]]
-    df_binary_neg = df_binary[df_binary['tag'] != tt[1]].sample(len(df_binary_pos))
-    ic(df_binary_pos['tag'].value_counts())
-    ic(df_binary_neg['tag'].value_counts())
-    df_binary_subsampled = pd.concat([df_binary_pos, df_binary_neg])#.sample(1000)
-    ic(df_binary_subsampled['tag'].value_counts())
+    target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/persuasion_techniques.txt').readlines())]
+    for i, tt in enumerate(target_tags):
+        print(f'Training model no. {i} of {len(target_tags)} for {tt} persuasion technique...')
+        labels_model = LabelSet(labels=[tt[1]])
+        
+        df_list = df.to_dict(orient='records')
+        df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=tt[1], mappings=mappings, labels_model=labels_model)
+        df_binary = pd.DataFrame(df_list_binary)
+        ic(df_binary['tag'].value_counts())
+        df_binary_pos = df_binary[df_binary['tag'] == tt[1]]
+        df_binary_neg = df_binary[df_binary['tag'] != tt[1]].sample(len(df_binary_pos))
+        ic(df_binary_pos['tag'].value_counts())
+        ic(df_binary_neg['tag'].value_counts())
+        df_binary_subsampled = pd.concat([df_binary_pos, df_binary_neg])#.sample(1000)
+        ic(df_binary_subsampled['tag'].value_counts())
 
-    binary_dataset = Dataset.from_pandas(df_binary_subsampled[['id', 'ner_tags', 'tokens']])#.filter(lambda example: example["text"] is not None)
-    # some samples have no text and cannot be tokenized so we filter them out
-    
-    split_ratio = 0.2
-    split_seed = 42
-    datadict = binary_dataset.train_test_split(split_ratio, seed=split_seed)
+        binary_dataset = Dataset.from_pandas(df_binary_subsampled[['id', 'ner_tags', 'tokens']])#.filter(lambda example: example["text"] is not None)
+        # some samples have no text and cannot be tokenized so we filter them out
+        
+        split_ratio = 0.2
+        split_seed = 42
+        datadict = binary_dataset.train_test_split(split_ratio, seed=split_seed)
 
-    # model_name = 'bert-base-multilingual-cased'
-    # model_name = 'xlm-roberta-base'
-    model_name = 'microsoft/mdeberta-v3-base'
-    model_name_simple = model_name.split('/')[-1]
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # model_name = 'bert-base-multilingual-cased'
+        # model_name = 'xlm-roberta-base'
+        model_name = 'microsoft/mdeberta-v3-base'
+        model_name_simple = model_name.split('/')[-1]
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    datadict = datadict.map(tokenize_and_align_labels, batched=True, batch_size=None)
+        datadict = datadict.map(lambda x: tokenize_and_align_labels(x, tokenizer), batched=True, batch_size=None)
 
-    columns = [
-                'input_ids',
-                'token_type_ids',
-                'attention_mask',
-                'labels'
-                ]
+        columns = [
+                    'input_ids',
+                    'token_type_ids',
+                    'attention_mask',
+                    'labels'
+                    ]
 
-    datadict.set_format('torch', columns = columns)
+        datadict.set_format('torch', columns = columns)
 
-    train_data = datadict['train']#.select(range(100))
-    val_data = datadict['test']
+        train_data = datadict['train']#.select(range(100))
+        val_data = datadict['test']
 
-    from transformers import DataCollatorForTokenClassification 
+        from transformers import DataCollatorForTokenClassification 
 
-    data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
+        data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
 
-    train_loader = DataLoader(train_data, batch_size=16, shuffle=True, collate_fn=data_collator)
-    val_loader = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=data_collator)
+        train_loader = DataLoader(train_data, batch_size=16, shuffle=True, collate_fn=data_collator)
+        val_loader = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=data_collator)
 
-    model = AutoModelForTokenClassification.from_pretrained(model_name,
-                                                            num_labels=len(labels_model.ids_to_label.values()),
-                                                            label2id=labels_model.labels_to_id,
-                                                            id2label=labels_model.ids_to_label,
-                                                            )
-    lr = 5e-5
-    optimizer = AdamW(model.parameters(), lr=lr)
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    epochs = 3
+        model = AutoModelForTokenClassification.from_pretrained(model_name,
+                                                                num_labels=len(labels_model.ids_to_label.values()),
+                                                                label2id=labels_model.labels_to_id,
+                                                                id2label=labels_model.ids_to_label,
+                                                                )
+        lr = 5e-5
+        optimizer = AdamW(model.parameters(), lr=lr)
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        epochs = 3
 
-    model.to(device)
+        model.to(device)
 
-    for epoch in range(epochs):
-        model.train()
-        train_loss = 0
-        progbar_train = tqdm(train_loader)
-        for i, batch in enumerate(progbar_train):
-            optimizer.zero_grad()
-            inputs = {
-            'input_ids': batch['input_ids'].to(device),
-            'token_type_ids': batch['token_type_ids'].to(device),
-            'attention_mask': batch['attention_mask'].to(device),
-            'labels': batch['labels'].to(device),
-            }
+        for _ in range(epochs):
+            model.train()
+            train_loss = 0
+            progbar_train = tqdm(train_loader)
+            for i, batch in enumerate(progbar_train):
+                optimizer.zero_grad()
+                inputs = {
+                'input_ids': batch['input_ids'].to(device),
+                'token_type_ids': batch['token_type_ids'].to(device),
+                'attention_mask': batch['attention_mask'].to(device),
+                'labels': batch['labels'].to(device),
+                }
 
-            outputs = model(**inputs)
+                outputs = model(**inputs)
 
-            loss = outputs.loss
-            loss.backward()
-            train_loss += loss.item()
-            
-            optimizer.step()
+                loss = outputs.loss
+                loss.backward()
+                train_loss += loss.item()
+                
+                optimizer.step()
 
-            train_loss_tmp = round(train_loss / (i + 1), 4)
-            progbar_train.set_postfix({'Train loss':train_loss_tmp})
+                train_loss_tmp = round(train_loss / (i + 1), 4)
+                progbar_train.set_postfix({'Train loss':train_loss_tmp})
 
-        final_results = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device)
-        print(final_results)
+            final_results = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device)
+            print(final_results)
 
-    models_dir = '/home/pgajo/checkthat24/checkthat24_DIT/models/M2'
-    model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_SUBSAMPLED_{date_time}'
-    model_save_dir = os.path.join(models_dir, model_save_name)
-    save_local_model(model_save_dir, model, tokenizer)
+        models_dir = './models/M2'
+        model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_SUBSAMPLED_{date_time}'
+        model_save_dir = os.path.join(models_dir, model_save_name)
+        save_local_model(model_save_dir, model, tokenizer)
 
-    final_results['train_data_path'] = train_data_path  
-    ic(type(final_results))
-    ic(final_results)
+        final_results['train_data_path'] = train_data_path  
+        ic(type(final_results))
+        ic(final_results)
 
-    with open(os.path.join(model_save_dir, 'results.json'), 'w', encoding='utf8') as f:
-        json.dump(dict(final_results), f, ensure_ascii = False)
+        with open(os.path.join(model_save_dir, 'results.json'), 'w', encoding='utf8') as f:
+            json.dump(dict(final_results), f, ensure_ascii = False)
 
-    info = {
-        'model_name': model_name,
-        'epochs': epochs,
-        'lr': lr,
-        'len(train_data)': len(train_data),
-        'len(val_data)': len(val_data),
-        'split_ratio': split_ratio,
-        'split_seed': split_seed,
-        'train_data_path': train_data_path,
-    }
+        info = {
+            'model_name': model_name,
+            'epochs': epochs,
+            'lr': lr,
+            'len(train_data)': len(train_data),
+            'len(val_data)': len(val_data),
+            'split_ratio': split_ratio,
+            'split_seed': split_seed,
+            'train_data_path': train_data_path,
+        }
 
-    with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:
-        json.dump(info, f, ensure_ascii = False)
+        with open(os.path.join(model_save_dir, 'info.json'), 'w', encoding='utf8') as f:
+            json.dump(info, f, ensure_ascii = False)
+
+if __name__ == "__main__":
+    main()

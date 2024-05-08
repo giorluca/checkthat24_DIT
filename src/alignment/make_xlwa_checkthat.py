@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import XLWADataset
 from transformers import AutoTokenizer
 from datasets import concatenate_datasets
@@ -39,7 +39,7 @@ def main():
     repo_id = f"pgajo/{save_name}"
     print('repo_id:', repo_id)
 
-    datasets_dir_path = f"/home/pgajo/checkthat24/checkthat24_DIT/data/alignment/train/en-{'-'.join(languages)}/{type(tokenizer).__name__}/{tokenizer_name.split('/')[-1]}"
+    datasets_dir_path = f"./data/alignment/train/en-{'-'.join(languages)}/{type(tokenizer).__name__}/{tokenizer_name.split('/')[-1]}"
     if not os.path.exists(datasets_dir_path):
         os.makedirs(datasets_dir_path)
     full_save_path = os.path.join(datasets_dir_path, save_name)

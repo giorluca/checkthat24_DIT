@@ -1,13 +1,13 @@
 import json
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import TASTEset, sub_shift_spans, regex_tokenizer_mappings, ent_formatter, nllb_lang2code
 from tqdm.auto import tqdm
 import os
 import re
 
-json_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
-# json_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json'
+json_path = './data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
+# json_path = './data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json'
 
 with open(json_path, 'r', encoding='utf8') as f:
     data = json.load(f)

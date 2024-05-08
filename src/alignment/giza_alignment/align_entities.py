@@ -5,7 +5,7 @@ from icecream import ic
 import os
 import logging
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import get_entities_from_sample, get_relations_from_sample
 import uuid
 import re
@@ -197,7 +197,7 @@ def main():
     # data_path = '/home/pgajo/food/data/TASTEset/data/SW-TASTE/en-es/SW-TASTE_DEEPL_unaligned_ls_tok_regex_en-es/SW-TASTE_DEEPL_unaligned_ls_tok_regex_en-es.json'
     # data_path = '/home/pgajo/food/data/GZ/GZ-GOLD/GZ-GOLD_301_tok_regex.json'
     # data_path = '/home/pgajo/food/data/mycolombianrecipes/MCR-GOLD_291_tok_regex.json'
-    data_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/it/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt.json'
+    data_path = './data/train_sent_mt_fixed/it/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt.json'
 
     with open(data_path, 'r', encoding='utf8') as f:
         data = json.load(f)
@@ -214,7 +214,7 @@ def main():
     # align_folder = '/home/pgajo/food/data/mycolombianrecipes/giza'
     # align_folder = '/home/pgajo/food/data/mycolombianrecipes/fast-align'
     
-    align_folder = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/it/giza_alignments'
+    align_folder = './data/train_sent_mt_fixed/it/giza_alignments'
 
     append_name = 'annotations'
     # append_name = 'predictions'

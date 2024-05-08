@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import token_span_to_char_indexes, TASTEset, get_entities_from_sample
 import torch
 torch.set_printoptions(linewidth=10000)
@@ -23,24 +23,25 @@ def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     
     model_name_list = [
-    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-bg/mdeberta_xlwa_en-bg/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52',
-    '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-es/mdeberta_xlwa_en-es/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-it/mdeberta_xlwa_en-it/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-pt/mdeberta_xlwa_en-pt/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-ru/mdeberta_xlwa_en-ru/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-sl/mdeberta_xlwa_en-sl/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14',
+    # './models/alignment/en-bg/mdeberta_xlwa_en-bg/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52',
+    # './models/alignment/en-es/mdeberta_xlwa_en-es/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43',
+    './models/alignment/en-it/mdeberta_xlwa_en-it/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00',
+    # './models/alignment/en-pt/mdeberta_xlwa_en-pt/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45',
+    # './models/alignment/en-ru/mdeberta_xlwa_en-ru/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20',
+    # './models/alignment/en-sl/mdeberta_xlwa_en-sl/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14',
     ]
 
     data_path_list = [
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es.json',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt.json',
+    # './data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es.json',
+    './data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it.json',
     ]
 
     for model_name, data_path in zip(model_name_list, data_path_list):
-        model = AutoModelForQuestionAnswering.from_pretrained(model_name).to(device)
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
         with open(data_path, 'r', encoding='utf8') as f:
             data = json.load(f)
+        
+        model = AutoModelForQuestionAnswering.from_pretrained(model_name).to(device)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         lang_src = re.search(r'xlwa_([a-z]{2})-([a-z]{2})_', model_name).group(1)
         lang_tgt = re.search(r'xlwa_([a-z]{2})-([a-z]{2})_', model_name).group(2)
@@ -61,22 +62,22 @@ def main():
             for entity in entity_list:
                 num_ents += 1
                 # get words comprising the entity
-                entity_words = sample['data']['text_src'][entity['value']['start']:entity['value']['end']].split()
+                entity_words = sample['data'][f'text_{lang_src}'][entity['value']['start']:entity['value']['end']].split()
                 word_span_list = []
                 start_list = []
                 end_list = []
                 for i, word in enumerate(entity_words):
-                    left = sample['data']['text_src'][entity['value']['start']:entity['value']['end']].find(word) + entity['value']['start']
+                    left = sample['data'][f'text_{lang_src}'][entity['value']['start']:entity['value']['end']].find(word) + entity['value']['start']
                     right = left + len(word)
-                    # monitor = sample['data']['text_src'][left:right]
+                    # monitor = sample['data'][f'text_{lang_src}'][left:right]
                     word_span_list.append({'start': left, 'end': right})
                 
                 for word_span in word_span_list:
-                    text_left = sample['data']['text_src'][:word_span['start']]
-                    text_right = sample['data']['text_src'][word_span['end']:]
-                    text_entity = sample['data']['text_src'][word_span['start']:word_span['end']]
+                    text_left = sample['data'][f'text_{lang_src}'][:word_span['start']]
+                    text_right = sample['data'][f'text_{lang_src}'][word_span['end']:]
+                    text_entity = sample['data'][f'text_{lang_src}'][word_span['start']:word_span['end']]
                     query = text_left + '• ' + text_entity + ' •' + text_right
-                    context = sample['data']['text_tgt']
+                    context = sample['data'][f'text_{lang_tgt}']
                     input = tokenizer(query, context, return_tensors='pt').to('cuda')
                     with torch.inference_mode():
                         outputs = model(**input)
@@ -96,7 +97,7 @@ def main():
                         end_index_token = torch.argmax(outputs['end_logits'], dim=1)
 
                     if start_index_token < end_index_token:
-                        start, end = token_span_to_char_indexes(input, start_index_token, end_index_token, sample['data'], tokenizer, field_name='text', lang='tgt')
+                        start, end = token_span_to_char_indexes(input, start_index_token, end_index_token, sample['data'], tokenizer, field_name='text', lang=lang_tgt)
                         start_list.append(start)
                         end_list.append(end)
                     elif start_index_token < len(tokenizer(query, return_tensors = 'pt')['input_ids'].squeeze()):
@@ -108,8 +109,8 @@ def main():
                     new_annotation_tgt = {'start': min(start_list), 'end': max(end_list), 'tag': entity['value']['labels'][0]}
                     annotation_list_tgt.append(new_annotation_tgt)
                 progbar.set_description(f'Entities: {num_ents} - Errors: {num_errors} - Err%: {round((num_errors/num_ents)*100, 2)}')
-                # print(new_sample['data']['text_src'][entity['value']['start']:entity['value']['end']])
-                # print(new_sample['data']['text_tgt'][new_annotation_tgt['start']:new_annotation_tgt['end']])
+                # print(new_sample['data'][f'text_{lang_src}'][entity['value']['start']:entity['value']['end']])
+                # print(new_sample['data'][f'text_{lang_tgt}'][new_annotation_tgt['start']:new_annotation_tgt['end']])
                 # print('##########################################')
             new_sample[f'annotations_{lang_tgt}'] = [{'result': annotation_list_tgt}]
             aligned_dataset.append(new_sample)

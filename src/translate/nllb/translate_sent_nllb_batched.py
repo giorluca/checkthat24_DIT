@@ -6,12 +6,12 @@ import os
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import argparse
 import sys
-sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
+sys.path.append('./src')
 from utils_checkthat import nllb_lang2code
 
 def main():
     parser = argparse.ArgumentParser(description="translate checkthat task 3 dataset")
-    parser.add_argument("--dataset_path", help="dataset json path", default='/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences.json')
+    parser.add_argument("--dataset_path", help="dataset json path", default='./data/train_gold/train_gold_sentences.json')
     parser.add_argument("--model_name", help="model huggingface repo name or model dir path", default="facebook/nllb-200-3.3B")
     parser.add_argument("--train_dir", help="path to translated train data directory")
     parser.add_argument("--src_lang", help="source language for dataset filtering", default="eng_Latn")

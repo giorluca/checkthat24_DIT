@@ -1,58 +1,21 @@
 import re
 import json
-
-def text_to_sentence_dataset(data):
-    # List to store dictionaries representing sentences with metadata
-    sentence_data = []
-    for sample in data:
-        # Tokenize the text into sentences
-        text = sample['text']#.replace('\n', '\n ')
-        sentences = re.findall(r'[^.!?]*[.!?]', text)
-
-        for sentence in sentences:
-            # Calculate the start and end indices of the sentence
-            start_index = text.index(sentence)
-            end_index = start_index + len(sentence)
-
-            # Adjust spans to sentence-level
-            adjusted_sentence_spans = []
-            for anno in sample['annotations']:
-                span_start = anno[f'start']
-                span_end = anno[f'end']
-                if span_start >= start_index and span_end <= end_index:
-                    adjusted_start = span_start - start_index
-                    adjusted_end = span_end - start_index + 1
-                    monitor = sentence[adjusted_start:adjusted_end+1]
-                    adjusted_sentence_spans.append({'start':adjusted_start, 'end':adjusted_end, 'tag':anno['tag']})
-
-            #If there are no annotations for the sentence
-            if not adjusted_sentence_spans:
-                sentence_dict = {
-                    'text': sentence,
-                    'article_id': sample['article_id'],
-                    'lang': sample['lang'],
-                    'annotations': [],
-                    'label':0
-                }
-            else:
-                # Create a dictionary representing the sentence with metadata
-                sentence_dict = {
-                    'text': sentence,
-                    'article_id': sample['article_id'],
-                    'lang': sample['lang'],
-                    'annotations': adjusted_sentence_spans,
-                    'label':1
-                }
-
-            sentence_data.append(sentence_dict)
-
-    return sentence_data
+import sys
+sys.path.append('./src')
+from utils_checkthat import text_to_sentence_sample
+import argparse
 
 def main():
-    data = json.load(open(f'/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_fixed.json', 'r', encoding='utf8'))
-    sentence_data = text_to_sentence_dataset(data)
+    parser = argparse.ArgumentParser(description="make checkthat24 sentence dataset from doc dataset")
+    parser.add_argument("--input", "-i", help="json doc dataset path", default='./data/formatted/train.json')
+    args = parser.parse_args()
+    data = json.load(open(args.input, 'r', encoding='utf8'))
 
-    with open(f'/home/pgajo/checkthat24/checkthat24_DIT/data/train_gold/train_gold_sentences_fixed.json', 'w', encoding='utf-8') as outfile: 
+    sentence_data = []
+    for sample in data:
+        sentence_data.extend(text_to_sentence_sample(sample))
+    out_path = args.input.replace('.json', '_sentences.json')
+    with open(out_path, 'w', encoding='utf-8') as outfile: 
         json.dump(sentence_data, outfile, ensure_ascii = False)
 
 if __name__ == '__main__':
