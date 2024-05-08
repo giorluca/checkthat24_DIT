@@ -1,14 +1,12 @@
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 import sys
 sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
-from utils_checkthat import token_span_to_char_indexes, TASTEset, sub_shift_spans, get_entities_from_sample
+from utils_checkthat import token_span_to_char_indexes, TASTEset, get_entities_from_sample
 import torch
 torch.set_printoptions(linewidth=10000)
 import json
 from tqdm.auto import tqdm
 import re
-from icecream import ic
-import spacy
 
 def word_idx_to_span(word, text = '', text_tokenized = []):
     word_idx = text_tokenized.index(word)
@@ -26,25 +24,16 @@ def main():
     
     model_name_list = [
     # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-bg/mdeberta_xlwa_en-bg/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-es/mdeberta_xlwa_en-es/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43',
-    '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-it/mdeberta_xlwa_en-it/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00',
+    '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-es/mdeberta_xlwa_en-es/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43',
+    # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-it/mdeberta_xlwa_en-it/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00',
     # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-pt/mdeberta_xlwa_en-pt/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45',
     # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-ru/mdeberta_xlwa_en-ru/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20',
     # '/home/pgajo/checkthat24/checkthat24_DIT/models/alignment/en-sl/mdeberta_xlwa_en-sl/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14',
     ]
 
     data_path_list = [
-    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/bg/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl.json',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/es/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json',
-    '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/it/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt.json',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/pt/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-por_Latn.json',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/ru/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl.json',
-    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/sl/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-slv_Latn.json',
-    ]
-
-    mappings = [
-        {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
-        {'pattern': r'\s+', 'target': ' '},
+    '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es.json',
+    # '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_src-tgt.json',
     ]
 
     for model_name, data_path in zip(model_name_list, data_path_list):
@@ -53,14 +42,11 @@ def main():
         with open(data_path, 'r', encoding='utf8') as f:
             data = json.load(f)
 
-        lang = re.search(r'xlwa_([a-z]{2})-([a-z]{2})_', model_name).group(1)
-        nlp = spacy.blank(lang) 
-        lang_src = 'src'
-        lang_tgt = 'tgt'
-        langs = [lang_src, lang_tgt]
-        del_list = ['annotations']
-        text_field = 'text'
-        # data = TASTEset.checkthat_to_label_studio(data, model_name='gold', languages=langs, del_list=del_list, text_field=text_field)
+        lang_src = re.search(r'xlwa_([a-z]{2})-([a-z]{2})_', model_name).group(1)
+        lang_tgt = re.search(r'xlwa_([a-z]{2})-([a-z]{2})_', model_name).group(2)
+        # lang_src = 'src'
+        # lang_tgt = 'tgt'
+        # langs = [lang_src, lang_tgt]
 
         aligned_dataset = []
 
@@ -70,10 +56,11 @@ def main():
         progbar.set_description(f'Entities: {num_ents} - Errors: {num_errors}')
         for sample in progbar:
             new_sample = sample
-            new_annotation_list = []
+            annotation_list_tgt = []
             entity_list = get_entities_from_sample(sample, langs=[lang_src], sort=True)
             for entity in entity_list:
                 num_ents += 1
+                # get words comprising the entity
                 entity_words = sample['data']['text_src'][entity['value']['start']:entity['value']['end']].split()
                 word_span_list = []
                 start_list = []
@@ -81,11 +68,14 @@ def main():
                 for i, word in enumerate(entity_words):
                     left = sample['data']['text_src'][entity['value']['start']:entity['value']['end']].find(word) + entity['value']['start']
                     right = left + len(word)
-                    monitor = sample['data']['text_src'][left:right]
+                    # monitor = sample['data']['text_src'][left:right]
                     word_span_list.append({'start': left, 'end': right})
                 
                 for word_span in word_span_list:
-                    query = sample['data']['text_src'][:word_span['start']] + '• ' + sample['data']['text_src'][word_span['start']:word_span['end']] + ' •' + sample['data']['text_src'][word_span['end']:]
+                    text_left = sample['data']['text_src'][:word_span['start']]
+                    text_right = sample['data']['text_src'][word_span['end']:]
+                    text_entity = sample['data']['text_src'][word_span['start']:word_span['end']]
+                    query = text_left + '• ' + text_entity + ' •' + text_right
                     context = sample['data']['text_tgt']
                     input = tokenizer(query, context, return_tensors='pt').to('cuda')
                     with torch.inference_mode():
@@ -110,18 +100,18 @@ def main():
                         start_list.append(start)
                         end_list.append(end)
                     elif start_index_token < len(tokenizer(query, return_tensors = 'pt')['input_ids'].squeeze()):
-                        print('wtf? wtf? wtf? wtf? wtf? wtf? wtf? wtf? wtf? wtf? wtf?')
+                        raise Exception('start_index_token predicted within sequence A (i.e. the query)')
                     else:
                         # print('### START TOKEN !< END TOKEN ###')
                         num_errors += 1
                 if start_list and end_list:
-                    new_annotation = {'start': min(start_list), 'end': max(end_list), 'tag': entity['value']['labels'][0]}
-                    new_annotation_list.append(new_annotation)
+                    new_annotation_tgt = {'start': min(start_list), 'end': max(end_list), 'tag': entity['value']['labels'][0]}
+                    annotation_list_tgt.append(new_annotation_tgt)
                 progbar.set_description(f'Entities: {num_ents} - Errors: {num_errors} - Err%: {round((num_errors/num_ents)*100, 2)}')
                 # print(new_sample['data']['text_src'][entity['value']['start']:entity['value']['end']])
-                # print(new_sample['data']['text_tgt'][new_annotation['start']:new_annotation['end']])
+                # print(new_sample['data']['text_tgt'][new_annotation_tgt['start']:new_annotation_tgt['end']])
                 # print('##########################################')
-            new_sample['annotations'] = [{'result': new_annotation_list}]
+            new_sample[f'annotations_{lang_tgt}'] = [{'result': annotation_list_tgt}]
             aligned_dataset.append(new_sample)
 
         filename = f"{data_path.replace('.json', '')}_{model_name.split('/')[-1]}.json".replace('unaligned', 'aligned')

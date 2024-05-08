@@ -634,23 +634,20 @@ class TASTEset(DatasetDict):
         return tasks
 
     @staticmethod
-    def checkthat_to_label_studio(data, model_name = '', languages = ['en', 'it'], label_field='annotations', text_field = 'ingredients', del_list = []):
+    def checkthat_to_label_studio(data, model_name = '', lang_list = ['en', 'it'], label_field='annotations', text_field = 'ingredients', del_list = []):
         tasks = []
         for sample in data:
             annotations = []
             results = []
-            for language in languages:
-                if label_field in sample.keys():
-                    for entity in sample[label_field]:
-                        results.append({
-                            'from_name': f'label_{language}',
-                            'to_name': f'{text_field}_{language}_ref',
-                            'type': 'labels',
-                            'value': {
+            for lang in lang_list:
+                if f'{label_field}_{lang}' in sample.keys():
+                    for entity in sample[f'{label_field}_{lang}']:
+                        ent = {
                                 'start': entity['start'],
                                 'end': entity['end'],
-                                'labels': [entity['tag']]}
-                                })
+                                'labels': [entity['tag']]
+                            }
+                        results.append(ent_formatter(ent, lang=lang, text_field=text_field))
             annotations.append({'model_version': model_name, 'result': results})
 
             for el in del_list:
@@ -1235,3 +1232,30 @@ def sub_shift_spans(text, ents = [], mappings = []):
     #     ic(text[ent['start']:ent['end']])
 
     return text, ents
+
+def ent_formatter(ent, lang = 'en', text_field = 'text'):
+    ent_formatted = {
+        'from_name': f'label_{lang}',
+        'to_name': f'{text_field}_{lang}_ref',
+        'type': 'labels',
+        'value': ent,
+    }
+    return ent_formatted
+
+nllb_lang2code = { # training languages in checkthat
+    "eng_Latn": 'en',
+    'fra_Latn': 'fr',
+    "ita_Latn": 'it',
+    'deu_Latn': 'de',
+    'rus_Cyrl': 'ru',
+    'pol_Latn': 'po',
+    'spa_Latn': 'es',
+    'arb_Arab': 'ar',
+    'slv_Latn': 'sl',
+    'bul_Cyrl': 'bg',
+    'por_Latn': 'pt',
+    'ell_Grek': 'gr',
+    'kat_Geor': 'ka'
+}
+
+nllb_code2lang = {value: key for key, value in nllb_lang2code.items()}

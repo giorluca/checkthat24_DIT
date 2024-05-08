@@ -147,7 +147,6 @@ def compute_metrics(predictions, labels, label_list):
 
     return flat_results
 
-
 def evaluate(model, val_loader, label_list, device):
     model.eval()
     eval_loss = 0
@@ -221,8 +220,6 @@ for i, tt in enumerate(target_tags):
     binary_dataset = Dataset.from_pandas(df_binary_subsampled[['id', 'ner_tags', 'tokens']])#.filter(lambda example: example["text"] is not None)
     # some samples have no text and cannot be tokenized so we filter them out
     
-    # binary_dataset = dataset.map((lambda x: span_to_words_annotation(x, target_tag=tt[1], mappings=mappings, labels_model=labels_model)), batched=True)
-
     split_ratio = 0.2
     split_seed = 42
     datadict = binary_dataset.train_test_split(split_ratio, seed=split_seed)

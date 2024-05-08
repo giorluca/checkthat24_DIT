@@ -1,11 +1,13 @@
 import json
 import sys
 sys.path.append('/home/pgajo/checkthat24/checkthat24_DIT/src')
-from utils_checkthat import TASTEset, sub_shift_spans, regex_tokenizer_mappings
+from utils_checkthat import TASTEset, sub_shift_spans, regex_tokenizer_mappings, ent_formatter, nllb_lang2code
 from tqdm.auto import tqdm
 import os
+import re
 
-json_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt_fixed/it/train_gold_sentences_fixed_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
+json_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
+# json_path = '/home/pgajo/checkthat24/checkthat24_DIT/data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json'
 
 with open(json_path, 'r', encoding='utf8') as f:
     data = json.load(f)
@@ -13,26 +15,18 @@ with open(json_path, 'r', encoding='utf8') as f:
 text_tokenized_src = []
 text_tokenized_tgt = []
 
-lang_src = 'src'
-lang_tgt = 'tgt'
+lang_src = nllb_lang2code[re.search(r'3.3B_(.*)-(.*).json', json_path).group(1)]
+lang_tgt = nllb_lang2code[re.search(r'3.3B_(.*)-(.*).json', json_path).group(2)]
+
 langs = [lang_src, lang_tgt]
-del_list = ['annotations']
+del_list = [f'annotations_{lang_src}', f'lang_{lang_src}', f'lang_{lang_tgt}']
 
 text_field = 'text'
 data_format = 'label_studio'
 # data_format = 'tasteset'
 strategy = 'regex'
 
-data = TASTEset.checkthat_to_label_studio(data, model_name='gold', languages=langs, del_list=del_list, text_field=text_field)
-
-def ent_formatter(ent, lang = 'en', text_field = 'text'):
-    ent_formatted = {
-        'from_name': f'label_{lang}',
-        'to_name': f'{text_field}_{lang}_ref',
-        'type': 'labels',
-        'value': ent,
-    }
-    return ent_formatted
+data = TASTEset.checkthat_to_label_studio(data, model_name='gold', lang_list=langs, del_list=del_list, text_field=text_field)
 
 data_tokenized = []
 for line in tqdm(data, total=len(data)):
@@ -46,7 +40,7 @@ for line in tqdm(data, total=len(data)):
         entry['data'].update({f'text_{lang}': text})
         if ents:
             entry['annotations'] = [{'result': [ent_formatter(e, lang=lang, text_field=text_field) for e in ents]}]
-        data_tokenized.append(entry)
+    data_tokenized.append(entry)
 
 new_dir = json_path.replace('.json', f'_tok_{strategy}_{lang_src}-{lang_tgt}')
 if not os.path.exists(new_dir):
