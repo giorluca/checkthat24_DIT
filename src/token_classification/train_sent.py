@@ -6,7 +6,7 @@ import torch
 from torch.optim import AdamW
 from tqdm import tqdm
 import numpy as np
-from datasets import Dataset as Dataset
+from datasets import Dataset
 import pandas as pd
 import os
 import sys
@@ -20,8 +20,9 @@ import evaluate
 from sklearn.metrics import f1_score
 from collections import Counter
 from seqeval.metrics import classification_report
+from transformers import DataCollatorForTokenClassification
 
-def tokenize_and_align_labels(examples, tokenizer):
+def tokenize_token_classification(examples, tokenizer):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding='longest', return_tensors='pt')
 
     labels = []
@@ -191,7 +192,7 @@ def main():
         {'pattern': r'\s+', 'target': ' '},
         ]
     
-    target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/persuasion_techniques.txt').readlines())]
+    target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/ persuasion_techniques.txt').readlines())]
     for i, tt in enumerate(target_tags):
         print(f'Training model no. {i} of {len(target_tags)} for {tt} persuasion technique...')
         labels_model = LabelSet(labels=[tt[1]])
@@ -220,7 +221,7 @@ def main():
         model_name_simple = model_name.split('/')[-1]
         tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        datadict = datadict.map(lambda x: tokenize_and_align_labels(x, tokenizer), batched=True, batch_size=None)
+        datadict = datadict.map(lambda x: tokenize_token_classification(x, tokenizer), batched=True, batch_size=None)
 
         columns = [
                     'input_ids',
@@ -233,8 +234,6 @@ def main():
 
         train_data = datadict['train']#.select(range(100))
         val_data = datadict['test']
-
-        from transformers import DataCollatorForTokenClassification 
 
         data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
 
