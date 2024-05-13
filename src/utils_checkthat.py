@@ -1221,11 +1221,11 @@ def sub_shift_spans(text, ents = [], mappings = []):
                             ent['start'] += len_diff
                             ent['end'] += len_diff
                 elif isinstance(ents, dict):
-                    if ents['start'] <= match_index and ents['end'] > match_index:
-                        ents['end'] += len_diff
-                    if ents['start'] > match_index:
-                        ents['start'] += len_diff
-                        ents['end'] += len_diff
+                    if ents['value']['start'] <= match_index and ents['value']['end'] > match_index:
+                        ents['value']['end'] += len_diff
+                    if ents['value']['start'] > match_index:
+                        ents['value']['start'] += len_diff
+                        ents['value']['end'] += len_diff
 
             adjustment += len_diff
     # for ent in ent_list:
@@ -1233,7 +1233,7 @@ def sub_shift_spans(text, ents = [], mappings = []):
 
     return text, ents
 
-def ent_formatter(ent, lang = 'en', text_field = 'text'):
+def ent_formatter(ent: dict, lang = 'en', text_field = 'text'):
     ent_formatted = {
         'from_name': f'label_{lang}',
         'to_name': f'{text_field}_{lang}_ref',
@@ -1260,9 +1260,9 @@ nllb_lang2code = { # training languages in checkthat
 
 nllb_code2lang = {value: key for key, value in nllb_lang2code.items()}
 
-def text_to_sentence_sample(sample):
+def text_to_sentence_sample(sample, lang='en', text_field='text'):
     # Tokenize the text into sentences
-    text = sample['text']#.replace('\n', '\n ')
+    text = sample[text_field]#.replace('\n', '\n ')
     
     # Updated regex pattern to correctly split sentences and handle ellipses
     sentences = re.findall(r'[^.!?]*[.!?]{1,3}', text)
@@ -1285,20 +1285,23 @@ def text_to_sentence_sample(sample):
                 if span_start >= start_index and span_end <= end_index:
                     adjusted_start = span_start - start_index
                     adjusted_end = span_end - start_index + 1
-                    adjusted_sentence_spans.append({'start': adjusted_start, 'end': adjusted_end, 'tag': anno['tag']})
+                    ent = {'start': adjusted_start, 'end': adjusted_end, 'labels': [anno['tag']]}
+                    adjusted_sentence_spans.append(ent_formatter(ent, lang=lang, text_field=text_field))
 
         # Determine label based on presence of annotations
         label = 1 if adjusted_sentence_spans else 0
         
         # Create a dictionary representing the sentence with metadata
         sentence_sample = {
+            'data': {
             'text': sentence,
             'article_id': sample['article_id'],
             'lang': sample['lang'],
-            'annotations': adjusted_sentence_spans,
             'label': label,
             'sent_start': start_index,
             'sent_end': end_index,
+            },
+            'annotations': [{'result': adjusted_sentence_spans}],
         }
         sentence_sample_list.append(sentence_sample)
 

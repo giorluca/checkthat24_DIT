@@ -11,7 +11,7 @@ import pandas as pd
 import os
 import sys
 sys.path.append('./src')
-from utils_checkthat import save_local_model, sub_shift_spans
+from utils_checkthat import save_local_model, sub_shift_spans, regex_tokenizer_mappings
 from icecream import ic
 import re
 from datetime import datetime
@@ -50,14 +50,37 @@ def dict_of_lists(lst_of_dicts):
             result[key].append(value)
     return dict(result)
 
+def list_of_dicts(dict_of_lists):
+    # First, we need to check if all lists are of the same length to ensure correct transformation
+    if not all(len(lst) == len(next(iter(dict_of_lists.values()))) for lst in dict_of_lists.values()):
+        raise ValueError("All lists in the dictionary must have the same length")
+
+    # Get the length of the items in any of the lists
+    length = len(next(iter(dict_of_lists.values())))
+    
+    # Create a list of dictionaries, one for each index in the lists
+    result = []
+    for i in range(length):
+        # Create a dictionary for the current index 'i' across all lists
+        new_dict = {key: dict_of_lists[key][i] for key in dict_of_lists}
+        result.append(new_dict)
+    
+    return result
+
 def span_to_words_annotation(samples, target_tag = '', mappings = {}, labels_model = []):
     samples_new = []
-    for i, (text, annotation_list) in enumerate(zip(samples['text'], samples['annotations'])):
+    # if not any([l for l in samples['annotations']]):
+        
+    for i in range(len(samples['data'])):
+        text, annotation_list = samples['data'][i]['text'], samples['annotations'][i][0]['result']
         labels_text = []
         tokens = []
+        if not annotation_list:
+            annotation_list = [[]]
         for j, annotation in enumerate(annotation_list):
-            if annotation['tag'] != target_tag:
-                continue
+            if isinstance(annotation, dict):
+                if annotation['value']['labels'][0] != target_tag:
+                    continue
             text_subshifted, ents = sub_shift_spans(text, annotation, mappings=mappings)
             text_subshifted_matches = re.finditer(r'[^\s]+', text_subshifted)
             labels_words = []
@@ -65,17 +88,18 @@ def span_to_words_annotation(samples, target_tag = '', mappings = {}, labels_mod
             for regex_match in text_subshifted_matches:
                 if j == 0:
                     tokens.append(regex_match.group())
-                if regex_match.start() < ents['start']:
-                    labels_words.append(labels_model.labels_to_id['O'])
-                elif regex_match.start() >= ents['start'] and regex_match.end() <= ents['end']:
-                    if first:
-                        labels_words.append(labels_model.labels_to_id['B-' + ents['tag']])
-                        first = False
-                    elif not first:
-                        labels_words.append(labels_model.labels_to_id['I-' + ents['tag']])
-                else:
-                    labels_words.append(labels_model.labels_to_id['O'])
-            labels_text.append({'labels': labels_words, 'tag': annotation['tag']})
+                if isinstance(annotation, dict):
+                    if regex_match.start() < ents['value']['start']:
+                        labels_words.append(labels_model.labels_to_id['O'])
+                    elif regex_match.start() >= ents['value']['start'] and regex_match.end() <= ents['value']['end']:
+                        if first:
+                            labels_words.append(labels_model.labels_to_id['B-' + ents['value']['labels'][0]])
+                            first = False
+                        elif not first:
+                            labels_words.append(labels_model.labels_to_id['I-' + ents['value']['labels'][0]])
+                    else:
+                        labels_words.append(labels_model.labels_to_id['O'])
+                    labels_text.append({'labels': labels_words, 'tag': annotation['value']['labels'][0]})
         allowed_labels = [labels_model.labels_to_id['O'],
                           labels_model.labels_to_id['B-' + target_tag],
                           labels_model.labels_to_id['I-' + target_tag],
@@ -172,33 +196,38 @@ def evaluate(model, val_loader, label_list, device):
     return results
 
 def main():
-    train_data_path = './data/formatted/train_sentences.json'
+    train_data_path = './data/formatted/train_sentences_ls.json'
     with open(train_data_path, 'r', encoding='utf8') as f:
         dataset_raw = json.load(f)
 
     date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     df_raw = pd.DataFrame(dataset_raw)  
 
-    df_pos = df_raw[df_raw['annotations'].apply(lambda x: len(x) > 0)]
-    df_neg = df_raw[df_raw['annotations'].apply(lambda x: x == [])].sample(len(df_pos))
+    df_filtered = df_raw
+
+    # get rows with annotations
+    df_pos = df_filtered[df_filtered['annotations'].apply(lambda x: len(x[0]['result']) > 0)]
+    ic(df_pos)
+    # get the same number of rows without any annotations
+    df_neg = df_filtered[df_filtered['annotations'].apply(lambda x: x[0]['result'] == [])].sample(len(df_pos))
+    ic(df_neg)
     df = pd.concat([
         df_pos,
         df_neg
         ]
         )
+    ic(df)
     
-    mappings = [
-        {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)', 'target': ' placeholder '},
-        {'pattern': r'\s+', 'target': ' '},
-        ]
-    
-    target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/ persuasion_techniques.txt').readlines())]
+    target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/persuasion_techniques.txt').readlines())]
+    shift = 0
     for i, tt in enumerate(target_tags):
+        if i < shift:
+            continue
         print(f'Training model no. {i} of {len(target_tags)} for {tt} persuasion technique...')
         labels_model = LabelSet(labels=[tt[1]])
         
         df_list = df.to_dict(orient='records')
-        df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=tt[1], mappings=mappings, labels_model=labels_model)
+        df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=tt[1], mappings=regex_tokenizer_mappings, labels_model=labels_model)
         df_binary = pd.DataFrame(df_list_binary)
         ic(df_binary['tag'].value_counts())
         df_binary_pos = df_binary[df_binary['tag'] == tt[1]]
@@ -220,7 +249,7 @@ def main():
         model_name = 'microsoft/mdeberta-v3-base'
         model_name_simple = model_name.split('/')[-1]
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-
+        batch_size = 16
         datadict = datadict.map(lambda x: tokenize_token_classification(x, tokenizer), batched=True, batch_size=None)
 
         columns = [
@@ -237,8 +266,8 @@ def main():
 
         data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer, padding = 'longest')
 
-        train_loader = DataLoader(train_data, batch_size=16, shuffle=True, collate_fn=data_collator)
-        val_loader = DataLoader(val_data, batch_size=16, shuffle=False, collate_fn=data_collator)
+        train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=data_collator)
+        val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False, collate_fn=data_collator)
 
         model = AutoModelForTokenClassification.from_pretrained(model_name,
                                                                 num_labels=len(labels_model.ids_to_label.values()),
@@ -248,11 +277,18 @@ def main():
         lr = 5e-5
         optimizer = AdamW(model.parameters(), lr=lr)
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        epochs = 3
+        epochs = 10
 
         model.to(device)
 
-        for _ in range(epochs):
+        patience = 2
+        patience_counter = 0
+        best_f1_score = 0
+        best_model = model
+        best_epoch = -1
+        results = {'results': []}
+
+        for epoch in range(epochs):
             model.train()
             train_loss = 0
             progbar_train = tqdm(train_loader)
@@ -276,20 +312,41 @@ def main():
                 train_loss_tmp = round(train_loss / (i + 1), 4)
                 progbar_train.set_postfix({'Train loss':train_loss_tmp})
 
-            final_results = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device)
-            print(final_results)
+            results_entry = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device)
+            results_entry['epoch'] = epoch
+            results['results'].append(results_entry)
+            print(results['results'][-1])
+            print(results)
 
+            current_f1_score = results['results'][-1]['macro avg_f1-score']
+            if current_f1_score > best_f1_score:
+                best_f1_score = current_f1_score
+                best_model = model
+                best_epoch = epoch
+                patience_counter = 0
+                print(f'Best model updated: current epoch macro f1 = {current_f1_score}')
+            else:
+                patience_counter += 1
+            
+            if patience_counter >= patience:
+                print("Early stopping triggered.")
+                break
+        
+        results['best_epoch'] = best_epoch + 1
+        
         models_dir = './models/M2'
         model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_SUBSAMPLED_{date_time}'
-        model_save_dir = os.path.join(models_dir, model_save_name)
-        save_local_model(model_save_dir, model, tokenizer)
+        model_save_dir = os.path.join(models_dir, date_time, model_save_name)
+        if not os.path.exists(model_save_dir):
+            os.makedirs(model_save_dir)
+        save_local_model(model_save_dir, best_model, tokenizer)
 
-        final_results['train_data_path'] = train_data_path  
-        ic(type(final_results))
-        ic(final_results)
+        results['train_data_path'] = train_data_path  
+        ic(type(results))
+        ic(results)
 
         with open(os.path.join(model_save_dir, 'results.json'), 'w', encoding='utf8') as f:
-            json.dump(dict(final_results), f, ensure_ascii = False)
+            json.dump(dict(results), f, ensure_ascii = False)
 
         info = {
             'model_name': model_name,

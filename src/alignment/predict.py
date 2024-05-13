@@ -1,7 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 import sys
 sys.path.append('./src')
-from utils_checkthat import token_span_to_char_indexes, TASTEset, get_entities_from_sample
+from utils_checkthat import token_span_to_char_indexes, TASTEset, get_entities_from_sample, ent_formatter
 import torch
 torch.set_printoptions(linewidth=10000)
 import json
@@ -23,23 +23,27 @@ def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     
     model_name_list = [
-    # './models/alignment/en-bg/mdeberta_xlwa_en-bg/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52',
-    # './models/alignment/en-es/mdeberta_xlwa_en-es/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43',
+    './models/alignment/en-bg/mdeberta_xlwa_en-bg/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52',
+    './models/alignment/en-es/mdeberta_xlwa_en-es/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43',
     './models/alignment/en-it/mdeberta_xlwa_en-it/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00',
-    # './models/alignment/en-pt/mdeberta_xlwa_en-pt/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45',
-    # './models/alignment/en-ru/mdeberta_xlwa_en-ru/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20',
-    # './models/alignment/en-sl/mdeberta_xlwa_en-sl/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14',
+    './models/alignment/en-pt/mdeberta_xlwa_en-pt/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45',
+    './models/alignment/en-ru/mdeberta_xlwa_en-ru/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20',
+    './models/alignment/en-sl/mdeberta_xlwa_en-sl/mdeberta-v3-base/mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14',
     ]
 
     data_path_list = [
-    # './data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es.json',
+    './data/train_sent_mt/bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl_tok_regex_en-bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl_tok_regex_en-bg.json',
+    './data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es.json',
     './data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it.json',
+    './data/train_sent_mt/pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn_tok_regex_en-pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn_tok_regex_en-pt.json',
+    './data/train_sent_mt/ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl_tok_regex_en-ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl_tok_regex_en-ru.json',
+    './data/train_sent_mt/sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn_tok_regex_en-sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn_tok_regex_en-sl.json',
     ]
 
     for model_name, data_path in zip(model_name_list, data_path_list):
         with open(data_path, 'r', encoding='utf8') as f:
             data = json.load(f)
-        
+        # data = data[:100]
         model = AutoModelForQuestionAnswering.from_pretrained(model_name).to(device)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -106,27 +110,23 @@ def main():
                         # print('### START TOKEN !< END TOKEN ###')
                         num_errors += 1
                 if start_list and end_list:
-                    new_annotation_tgt = {'start': min(start_list), 'end': max(end_list), 'tag': entity['value']['labels'][0]}
+                    ent = {'start': min(start_list), 'end': max(end_list), 'labels': entity['value']['labels']}
+                    new_annotation_tgt = ent_formatter(ent, lang = lang_tgt, text_field='text')
+                    
                     annotation_list_tgt.append(new_annotation_tgt)
                 progbar.set_description(f'Entities: {num_ents} - Errors: {num_errors} - Err%: {round((num_errors/num_ents)*100, 2)}')
                 # print(new_sample['data'][f'text_{lang_src}'][entity['value']['start']:entity['value']['end']])
                 # print(new_sample['data'][f'text_{lang_tgt}'][new_annotation_tgt['start']:new_annotation_tgt['end']])
                 # print('##########################################')
-            new_sample[f'annotations_{lang_tgt}'] = [{'result': annotation_list_tgt}]
+            new_sample[f'annotations'][0]['result'].extend(annotation_list_tgt)
             aligned_dataset.append(new_sample)
 
-        filename = f"{data_path.replace('.json', '')}_{model_name.split('/')[-1]}.json".replace('unaligned', 'aligned')
+        filename = f"{data_path.replace('.json', '')}_{model_name.split('/')[-1]}_ls.json".replace('unaligned', 'aligned')
 
         with open(filename, 'w', encoding='utf8') as f:
             json.dump(aligned_dataset, f, ensure_ascii=False)
 
         print(filename)
-
-        ls_data = TASTEset.tasteset_to_label_studio(data, model_name)
-
-        ls_filename = filename.replace('.json', '_ls.json')
-        with open(ls_filename, 'w', encoding='utf8') as f:
-            json.dump(ls_data, f, ensure_ascii=False)
 
 if __name__ == '__main__':
     main()

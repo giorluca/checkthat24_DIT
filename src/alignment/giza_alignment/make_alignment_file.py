@@ -6,8 +6,12 @@ from tqdm.auto import tqdm
 import os
 import re
 
-json_path = './data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
+# json_path = './data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn.json'
 # json_path = './data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn.json'
+# json_path = './data/train_sent_mt/bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl.json'
+# json_path = './data/train_sent_mt/pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn.json'
+# json_path = './data/train_sent_mt/ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl.json'
+json_path = './data/train_sent_mt/sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn.json'
 
 with open(json_path, 'r', encoding='utf8') as f:
     data = json.load(f)

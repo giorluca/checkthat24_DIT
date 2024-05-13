@@ -11,7 +11,7 @@ from utils_checkthat import nllb_lang2code
 
 def main():
     parser = argparse.ArgumentParser(description="translate checkthat task 3 dataset")
-    parser.add_argument("--dataset_path", help="dataset json path", default='./data/train_gold/train_gold_sentences.json')
+    parser.add_argument("--dataset_path", help="dataset json path", default='./data/formatted/train_sentences.json')
     parser.add_argument("--model_name", help="model huggingface repo name or model dir path", default="facebook/nllb-200-3.3B")
     parser.add_argument("--train_dir", help="path to translated train data directory")
     parser.add_argument("--src_lang", help="source language for dataset filtering", default="eng_Latn")
@@ -35,17 +35,17 @@ def main():
 
     translated_dicts = []
 
-    data = [sample for sample in data if sample['lang'] == nllb_lang2code[args.src_lang]]
+    data = [sample for sample in data if sample['data']['lang'] == nllb_lang2code[args.src_lang]]
     # data = data[:200]
 
     batch_size = 64
     for i in tqdm(range(0, len(data), batch_size)):
-        # if line['lang'] == nllb_lang2code[args.src_lang]:
+        # if line['data']['lang'] == nllb_lang2code[args.src_lang]:
         text_tgt = ''
-        texts_src = [line['text'] for line in data[i:i+batch_size]]
-        article_ids = [line['article_id'] for line in data[i:i+batch_size]]
+        texts_src = [line['data']['text'] for line in data[i:i+batch_size]]
+        article_ids = [line['data']['article_id'] for line in data[i:i+batch_size]]
         annotations = [line['annotations'] for line in data[i:i+batch_size]]
-        labels = [line['label'] for line in data[i:i+batch_size]]
+        labels = [line['data']['label'] for line in data[i:i+batch_size]]
         inputs = tokenizer(texts_src,
                         return_tensors="pt",
                         padding = 'longest',
@@ -62,14 +62,16 @@ def main():
         print(texts_tgt)
         for j, text in enumerate(texts_tgt):
             entry = {
+                'data': {
                 f'text_{nllb_lang2code[args.src_lang]}': texts_src[j],
                 f'text_{nllb_lang2code[args.tgt_lang]}': text,
                 # f'lang_{nllb_lang2code[args.src_lang]}': args.src_lang,
                 # f'lang_{nllb_lang2code[args.tgt_lang]}': args.tgt_lang,
                 'article_id': article_ids[j],
                 'line_id': i + j,
-                f'annotations_{nllb_lang2code[args.src_lang]}': annotations[j],
                 'labels': labels[j],
+                },
+                'annotations': annotations[j],
             }
             
             translated_dicts.append(dict(sorted(entry.items())))

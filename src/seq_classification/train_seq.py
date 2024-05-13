@@ -12,6 +12,7 @@ import os
 import sys
 sys.path.append('./src')
 from utils_checkthat import save_local_model
+from token_classification.train_sent import dict_of_lists
 from datetime import datetime
 from icecream import ic
 
@@ -46,14 +47,18 @@ def evaluate(model, val_loader, device):
 
     return results
 
-def tokenize_sequence_classification(examples, tokenizer):        
-    output = tokenizer(examples["text"],
+def tokenize_sequence_classification(examples, tokenizer):
+    annotations = examples['annotations']
+    data = dict_of_lists(examples['data'])
+    output = tokenizer(data["text"],
                                 truncation=True,
                                 padding = 'longest',
                                 return_tensors='pt'
                                 )
-    if 'label' in examples.keys():
-        output['labels'] = torch.tensor(examples['label'])
+    
+    output['labels'] = torch.tensor(data['label'])
+    output.update(data)
+    output['annotations'] = annotations
     return output
 
 def main():
@@ -160,7 +165,7 @@ def main():
             best_epoch = epoch
             print(f'Best model updated: current epoch macro f1 = {current_f1_score}')
 
-    results['best_epoch'] = best_epoch
+    results['best_epoch'] = best_epoch + 1
 
     models_dir = './models/M1'
     if not os.path.exists(models_dir):

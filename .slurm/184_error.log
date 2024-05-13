@@ -1,3 +1,0 @@
-/opt/miniconda3/envs/checkthat/lib/python3.8/site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
-  warnings.warn(
-slurmstepd-john: error: *** JOB 184 ON john CANCELLED AT 2024-05-08T10:22:44 ***
