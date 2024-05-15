@@ -1,0 +1,16 @@
+	persuasion_technique	precision	recall	f1	n_samples
+0	Red_Herring	0.0	0.0	0.0	0
+1	Appeal_to_Popularity	0.0	0.0	0.0	0
+2	Appeal_to_Values	0.0	0.0	0.0	0
+3	Whataboutism	0.0	0.0	0.0	0
+4	Slogans	0.4742268041237113	0.2804878048780488	0.35249042145593873	164
+5	Causal_Oversimplification	0.0	0.0	0.0	0
+6	Flag_Waving	0.45054945054945056	0.3253968253968254	0.37788018433179726	126
+7	Appeal_to_Time	0.0	0.0	0.0	82
+8	Consequential_Oversimplification	0.13725490196078433	0.06796116504854369	0.0909090909090909	103
+9	Appeal_to_Authority	0.27350427350427353	0.1839080459770115	0.21993127147766323	174
+10	Conversation_Killer	0.0	0.0	0.0	0
+11	Straw_Man	0.0	0.0	0.0	0
+12	False_Dilemma-No_Choice	0.39285714285714285	0.2619047619047619	0.3142857142857143	126
+13	Appeal_to_Fear-Prejudice	0.0	0.0	0.0	0
+14	Loaded_Language	0.0	0.0	0.0	0

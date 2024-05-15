@@ -7,7 +7,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="make checkthat24 sentence dataset from doc dataset")
-    parser.add_argument("--input", "-i", help="json doc dataset path", default='./data/formatted/dev.json')
+    parser.add_argument("--input", "-i", help="json doc dataset path", default='./data/formatted/test.json')
     args = parser.parse_args()
     data = json.load(open(args.input, 'r', encoding='utf8'))
 

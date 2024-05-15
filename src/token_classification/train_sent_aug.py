@@ -1,5 +1,4 @@
 import json
-from sequence_aligner.labelset import LabelSet
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from torch.utils.data import DataLoader
 import torch
@@ -11,16 +10,31 @@ import pandas as pd
 import os
 import sys
 sys.path.append('./src')
+from sequence_aligner.labelset import LabelSet
 from utils_checkthat import save_local_model, sub_shift_spans, regex_tokenizer_mappings, get_entities_from_sample
 from icecream import ic
 import re
 from datetime import datetime
 from collections import defaultdict
 import evaluate
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score
 from collections import Counter
 from seqeval.metrics import classification_report
 from transformers import DataCollatorForTokenClassification
+
+from torch.nn import CrossEntropyLoss
+
+class WeightedLoss(CrossEntropyLoss):
+    def __init__(self, weight=None, size_average=None, ignore_index=-100, reduce=None, reduction='mean'):
+        super(WeightedLoss, self).__init__(weight, size_average, ignore_index, reduce, reduction)
+
+    def forward(self, input, target):
+        # Ensure weight tensor is on the same device as input
+        weight = torch.tensor([0.5 if x == 0 else 2.0 for x in target.view(-1)], device=input.device, dtype=input.dtype)
+        # Ensure target is on the same device as input
+        target = target.to(input.device)
+        loss = super(WeightedLoss, self).forward(input.view(-1, input.size(-1)), target.view(-1))
+        return (loss * weight).mean()
 
 def tokenize_token_classification(examples, tokenizer):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding='longest', return_tensors='pt')
@@ -123,7 +137,12 @@ def span_to_words_annotation(samples, target_tag = '', mappings = {}, labels_mod
         })
     return samples_new
 
-def compute_metrics(predictions, labels, label_list):
+def compute_metrics(predictions, labels, label_list, threshold=0.9):
+    # Apply softmax to predictions to get probabilities
+    predictions = torch.softmax(torch.tensor(predictions), dim=-1).numpy()
+
+    # Apply threshold to make predictions more cautious
+    predictions = np.where(predictions >= threshold, predictions, 0)
     predictions = np.argmax(predictions, axis=2)
 
     # Extract the true predictions and labels from the sequences
@@ -143,11 +162,15 @@ def compute_metrics(predictions, labels, label_list):
     flat_true_predictions = [item for sublist in true_predictions for item in sublist]
     flat_true_labels = [item for sublist in true_labels for item in sublist]
 
-    # Calculate micro F1-score using sklearn
+    # Calculate precision and micro F1-score using sklearn
+    precision = precision_score(flat_true_labels, flat_true_predictions, average='micro')
     micro_f1 = f1_score(flat_true_labels, flat_true_predictions, average='micro')
 
     # Prepare the results dictionary
-    flat_results = {'micro_f1': float(micro_f1)}
+    flat_results = {
+        'micro_f1': float(micro_f1),
+        'precision': float(precision)
+    }
 
     # Add detailed metrics for each label to the results dictionary
     for label, metrics in results.items():
@@ -162,27 +185,32 @@ def compute_metrics(predictions, labels, label_list):
 
     return flat_results
 
-def evaluate(model, val_loader, label_list, device):
+def evaluate(model, val_loader, label_list, device, threshold=0.9):
     model.eval()
     eval_loss = 0
     preds_list = []
     golds_list = []
+
+    loss_fn = WeightedLoss()
 
     progbar_val = tqdm(val_loader)
     for i, batch in enumerate(progbar_val):
         with torch.no_grad():
             inputs = {
                 'input_ids': batch['input_ids'].to(device),
-                # 'token_type_ids': batch['token_type_ids'].to(device),
+                'token_type_ids': batch['token_type_ids'].to(device) if 'token_type_ids' in batch else None,
                 'attention_mask': batch['attention_mask'].to(device),
                 'labels': batch['labels'].to(device),
             }
 
+            # Remove None values in inputs
+            inputs = {k: v for k, v in inputs.items() if v is not None}
+
             outputs = model(**inputs)
-            loss = outputs.loss
+            loss = loss_fn(outputs.logits.view(-1, model.config.num_labels), inputs['labels'].view(-1))
             eval_loss += loss.item()
 
-            preds_list.append(outputs['logits'].detach().cpu().numpy())
+            preds_list.append(outputs.logits.detach().cpu().numpy())
             golds_list.append(inputs['labels'].detach().cpu().numpy())
 
             val_loss_tmp = round(eval_loss / (i + 1), 4)
@@ -192,7 +220,7 @@ def evaluate(model, val_loader, label_list, device):
     preds = np.vstack(preds_list)
     golds = np.vstack(golds_list)
 
-    results = compute_metrics(preds, golds, label_list)
+    results = compute_metrics(preds, golds, label_list, threshold)
 
     return results
 
@@ -204,12 +232,12 @@ def make_balanced_df(df):
     balanced_df = pd.concat([df_pos, df_neg])
     return balanced_df
 
-def make_binary_balanced_df(df, target_tag = '', labels_model=[]):
+def make_binary_balanced_df(df, target_tag='', labels_model=[]):
     df_list = df.to_dict(orient='records')
     df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=target_tag, mappings=regex_tokenizer_mappings, labels_model=labels_model)
     df_binary = pd.DataFrame(df_list_binary)
     df_binary_pos = df_binary[df_binary['tag'] == target_tag]
-    df_binary_neg = df_binary[df_binary['tag'] != target_tag].sample(len(df_binary_pos))
+    df_binary_neg = df_binary[df_binary['tag'] != target_tag].sample(len(df_binary_pos), replace=True)  # Over-sampling
     df_binary_subsampled = pd.concat([df_binary_pos, df_binary_neg])
     return df_binary_subsampled
 
@@ -247,7 +275,7 @@ def main():
     balanced_df_aug = make_balanced_df(df_aug)
     
     target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/persuasion_techniques.txt').readlines())]
-    shift = 0
+    shift = 14
     for i, tt in enumerate(target_tags):
         if i < shift:
             continue
@@ -268,8 +296,8 @@ def main():
 
         # model_name = 'bert-base-multilingual-cased'
         # model_name = 'xlm-roberta-base'
-        # model_name = 'microsoft/mdeberta-v3-base'
-        model_name = 'FacebookAI/xlm-roberta-large'
+        model_name = 'microsoft/mdeberta-v3-base'
+        # model_name = 'FacebookAI/xlm-roberta-large'
         model_name_simple = model_name.split('/')[-1]
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         batch_size = 16
@@ -280,7 +308,7 @@ def main():
 
         columns = [
                     'input_ids',
-                    # 'token_type_ids',
+                    'token_type_ids',
                     'attention_mask',
                     'labels'
                     ]
@@ -313,7 +341,9 @@ def main():
         best_model = model
         best_epoch = -1
         results = {'results': []}
-
+        
+        loss_fn = WeightedLoss()
+        threshold = 0.9
         for epoch in range(epochs):
             model.train()
             train_loss = 0
@@ -322,14 +352,15 @@ def main():
                 optimizer.zero_grad()
                 inputs = {
                 'input_ids': batch['input_ids'].to(device),
-                # 'token_type_ids': batch['token_type_ids'].to(device),
+                'token_type_ids': batch['token_type_ids'].to(device),
                 'attention_mask': batch['attention_mask'].to(device),
                 'labels': batch['labels'].to(device),
                 }
 
                 outputs = model(**inputs)
 
-                loss = outputs.loss
+                # loss = outputs.loss
+                loss = loss_fn(outputs.logits.view(-1, model.config.num_labels), batch['labels'].view(-1))
                 loss.backward()
                 train_loss += loss.item()
                 
@@ -338,7 +369,7 @@ def main():
                 train_loss_tmp = round(train_loss / (i + 1), 4)
                 progbar_train.set_postfix({'Train loss':train_loss_tmp})
 
-            results_entry = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device)
+            results_entry = evaluate(model, val_loader, [value for value in labels_model.ids_to_label.values()], device, threshold = threshold)
             results_entry['epoch'] = epoch
             results['results'].append(results_entry)
             print(results['results'][-1])
@@ -362,7 +393,7 @@ def main():
         
         models_dir = './models/M2'
         model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_SUBSAMPLED_{date_time}'
-        model_save_dir = os.path.join(models_dir, date_time+'_aug', model_save_name)
+        model_save_dir = os.path.join(models_dir, date_time+'_aug'+'_ts'+str(threshold), model_save_name)
         if not os.path.exists(model_save_dir):
             os.makedirs(model_save_dir)
         save_local_model(model_save_dir, best_model, tokenizer)

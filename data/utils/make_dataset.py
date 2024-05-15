@@ -45,7 +45,7 @@ mappings = [
 
 dataset = []
 suffix = ''
-split = 'train'
+split = 'test'
 annotated = 1
 
 # Load gold standard annotations
@@ -53,7 +53,7 @@ for lang in os.listdir(main_folder):
     lang_path = os.path.join(main_folder, lang)
     if annotated:
         if f'{split}-labels-subtask-3-spans' in os.listdir(lang_path):
-            spans_path = os.path.join(lang_path, f'train-labels-subtask-3-spans{suffix}.json')
+            spans_path = os.path.join(lang_path, f'{split}-labels-subtask-3-spans{suffix}.json')
             with open(spans_path, 'r', encoding='utf-8') as f:
                 label_data = json.load(f)
     else:

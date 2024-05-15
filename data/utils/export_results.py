@@ -2,12 +2,12 @@ import json
 import os
 import pandas as pd
 
-path = './models/M2/2024-05-12-17-42-10_aug'
+path = './models/M2/2024-05-14-06-51-04_aug_ts0.9'
 
 results = []
 for subdir in os.listdir(path):
     res = json.load(open(os.path.join(path, subdir, 'results.json')))['results'][-1]
-    metrics = list(res.items())[1:5]
+    metrics = list(res.items())[2:6]
     results.append(metrics)
 
 print(results)

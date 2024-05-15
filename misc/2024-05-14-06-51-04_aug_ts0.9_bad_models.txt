@@ -1,0 +1,6 @@
+Appeal_to_Values
+Red_Herring
+Appeal_to_Popularity
+Obfuscation-Vagueness-Confusion
+Straw_Man
+Whataboutism

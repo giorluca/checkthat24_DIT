@@ -67,27 +67,32 @@ def main():
     train_data_path = './data/formatted/train_sentences.json'
 
     with open(train_data_path, 'r', encoding='utf8') as f:
-        dataset_raw = json.load(f)
+        data = json.load(f)
 
     langs = []
-    for el in dataset_raw:
-        langs.append(el['lang'])
+    for sample in data:
+        langs.append(sample['data']['lang'])
     langs = set(langs)
 
-    df = pd.DataFrame(dataset_raw)
-    df_pos = df[df['label'] == 1]
-    df_neg = pd.DataFrame()
+    df = pd.DataFrame(data)
+    df_sampled = pd.DataFrame()
     for lang in langs:
-        df_lang = df[df['lang'] == lang]
-        df_pos_lang = df_pos[df_pos['lang'] == lang]
-        df_lang_sampled = df_lang.sample(len(df_pos_lang))
-        df_neg = pd.concat([df_neg, df_lang_sampled])
-
-    df = pd.concat([df_pos, df_neg], axis=0)
-    ic(df_pos['lang'].value_counts())
-    ic(df_neg['lang'].value_counts())
-    ic(df['lang'].value_counts())
-    dataset = Dataset.from_pandas(df[['lang', 'annotations', 'text', 'article_id', 'label']])#.filter(lambda example: example["text"] is not None) # some samples have no text and cannot be tokenized so we filter them out
+        df_lang = df[df['data'].apply(lambda x: x['lang'] == lang)]
+        df_pos_lang = df_lang[df_lang['data'].apply(lambda x: x['label'] == 1)]
+        df_neg_lang = df_lang[df_lang['data'].apply(lambda x: x['label'] == 0)]
+        if len(df_neg_lang) > len(df_pos_lang):
+            df_neg_lang = df_neg_lang.sample(len(df_pos_lang))
+            print('len(df_neg_lang) > len(df_pos_lang)')
+        df_lang_sampled = pd.concat([df_pos_lang, df_neg_lang])
+        df_sampled = pd.concat([df_sampled, df_lang_sampled])
+    
+    df_sampled_pos = df_sampled[df_sampled['data'].apply(lambda x: x['label'] == 1)]
+    df_sampled_neg = df_sampled[df_sampled['data'].apply(lambda x: x['label'] == 0)]
+    
+    ic(df_sampled_pos['data'].apply(lambda x: x['lang']).value_counts())
+    ic(df_sampled_neg['data'].apply(lambda x: x['lang']).value_counts())
+    ic(df_sampled['data'].apply(lambda x: x['lang']).value_counts())
+    dataset = Dataset.from_pandas(df_sampled)
 
     # model_name = 'bert-base-multilingual-cased'
     # model_name = 'xlm-roberta-base'
@@ -124,7 +129,7 @@ def main():
     lr = 5e-5
     optimizer = AdamW(model.parameters(), lr=lr)
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    epochs = 3
+    epochs = 10
 
     model.to(device)
 

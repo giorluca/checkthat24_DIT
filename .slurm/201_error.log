@@ -1,0 +1,8 @@
+Map:   0%|          | 0/13841 [00:00<?, ? examples/s]Asking to truncate to max_length but no maximum length is provided and the model has no predefined maximum length. Default to no truncation.
+Map: 100%|██████████| 13841/13841 [00:03<00:00, 4596.84 examples/s]Map: 100%|██████████| 13841/13841 [00:03<00:00, 4572.33 examples/s]
+Traceback (most recent call last):
+  File "./src/token_classification/inference.py", line 256, in <module>
+    main()
+  File "./src/token_classification/inference.py", line 92, in main
+    for model_dir in os.listdir(model_dir_m2):
+FileNotFoundError: [Errno 2] No such file or directory: './models/M2/2024-05-13-23-08-48_aug'

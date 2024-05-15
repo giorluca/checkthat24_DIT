@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "./src/token_classification/inference.py", line 260, in <module>
+    main()
+  File "./src/token_classification/inference.py", line 91, in main
+    df_list_binary = span_to_words_annotation(dict_of_lists(data), target_tag=tt[1], mappings=regex_tokenizer_mappings, labels_model=labels_model)
+  File "/home/pgajo/checkthat24/checkthat24_DIT/./src/token_classification/train_sent.py", line 74, in span_to_words_annotation
+    for i in range(len(samples['data'])):
+KeyError: 'data'
