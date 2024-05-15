@@ -59,4 +59,6 @@ with open(f"./misc/{path.split('/')[-1]}_bad_models.txt", 'w', encoding='utf8') 
     for col in cols:
         f.write(col.strip() + '\n')
 
-df.to_csv(f"./misc/{path.split('/')[-1]}_results.tsv", sep='\t')
+output_path = f"./misc/{path.split('/')[-1]}_results.tsv"
+df.to_csv(output_path, sep='\t')
+print('output_path', output_path)
