@@ -1,7 +1,7 @@
 import json
 import sys
 sys.path.append('./src')
-from token_classification.train_sent import span_to_words_annotation, dict_of_lists, list_of_dicts, tokenize_token_classification, compute_metrics
+from token_classification.train_sent import span_to_words_annotation, dict_of_lists, list_of_dicts, tokenize_token_classification
 from seq_classification.train_seq import tokenize_sequence_classification
 from utils_checkthat import regex_tokenizer_mappings
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForTokenClassification, DataCollatorWithPadding, DataCollatorForTokenClassification
@@ -14,7 +14,6 @@ import torch
 torch.set_printoptions(linewidth=100000, threshold=100000)
 from tqdm import tqdm
 import re
-import numpy as np
 
 class SequenceCollator(DataCollatorWithPadding):
     def __init__(self, tokenizer, padding, exclusion_columns):
@@ -49,6 +48,44 @@ class TokenCollator(DataCollatorForTokenClassification):
         output_batch = super().torch_call(list_of_dicts(features))
         output_batch.update(raw_columns)
         return output_batch
+
+def convert_tensors_for_submission(outputs_1, outputs_2, batch_1, batch_2, tokenizer, target_tag):
+    preds_formatted = []
+    predictions_1 = torch.argmax(outputs_1.logits, dim=1)
+    predictions_2 = torch.argmax(outputs_2.logits, dim=2)
+    zero_indices = (predictions_1 == 0).nonzero(as_tuple=True)[0] # get indices of 0 preds from sequence classifier
+    predictions_2[zero_indices, :] = 0 # turn the same indexes into all 0s in the token predictions
+    
+    # convert the prediction tensor to the submission format
+    token_list = batch_2['tokens']
+    encodings = tokenizer(token_list, return_tensors='pt', padding='longest', truncation=True, is_split_into_words=True)
+
+    for j in range(encodings.input_ids.shape[0]):
+        indeces = [int(el) for el in (predictions_2[j, :] != 0)] # binarized predictions
+        word_list = []
+        for idx, value in enumerate(indeces):
+            word_idx = encodings.token_to_word(j, idx)
+            word = batch_2['tokens'][j][word_idx] if word_idx is not None else None
+            word_list.append({'idx': word_idx, 'value': value, 'word': word})
+        span_left_idx_list = []
+        span_right_idx_list = []
+        shift = 0
+        for k, w in enumerate(word_list):
+            if w['word'] is not None:
+                if w['value'] == 1:
+                    span_left_idx = batch_1['text'][j][shift:].find(w['word'])
+                    left = span_left_idx + shift + batch_1['sent_start'][j]
+                    right = left + len(w['word'])
+                    span_left_idx_list.append(left)
+                    span_right_idx_list.append(right)
+                elif k > 0 and span_left_idx_list and span_right_idx_list:
+                    left = min(span_left_idx_list)
+                    right = max(span_right_idx_list)
+                    article_id = batch_1['article_id'][j]
+                    preds_formatted.append(f'{article_id}\t{target_tag}\t{left}\t{right}')
+                    span_left_idx_list = []
+                    span_right_idx_list = []
+    return preds_formatted
 
 def main():
 
@@ -161,10 +198,9 @@ def main():
             m2.to(device)
             m2.eval()
             eval_loss = 0
-            preds_formatted = []
             preds_list = []
             golds_list = []
-            label_list = [value for value in labels_model.ids_to_label.values()]
+            # label_list = [value for value in labels_model.ids_to_label.values()]
 
             progbar_val = tqdm(zip(val_loader_seq, val_loader_token), total=len(val_loader_seq), desc='Inference...')
             for i, (batch_seq, batch_token) in enumerate(progbar_val):
@@ -178,9 +214,6 @@ def main():
 
                     out_1 = m1(**inputs_seq)
 
-                    preds_1 = torch.argmax(out_1.logits, dim=1)
-                    # print('preds_1', preds_1)
-
                     inputs_token = {
                         'input_ids': batch_token['input_ids'].to(device),
                         'token_type_ids': batch_token['token_type_ids'].to(device),
@@ -189,42 +222,6 @@ def main():
                     }
 
                     out_2 = m2(**inputs_token)
-
-                    preds_2 = torch.argmax(out_2.logits, dim=2)
-                    # print('preds_2', preds_2)
-                    zero_indices = (preds_1 == 0).nonzero(as_tuple=True)[0] # get indices of 0 preds from sequence classifier
-                    preds_2[zero_indices, :] = 0 # turn the same indexes into all 0s in the token predictions
-                    # print('preds_2', preds_2)
-                    
-                    # convert the prediction tensor to the submission format
-                    token_list = batch_token['tokens']
-                    encodings = tokenizer_m2(token_list, return_tensors='pt', padding='longest', truncation=True, is_split_into_words=True)
-
-                    for j in range(encodings.input_ids.shape[0]):
-                        indeces = [int(el) for el in (preds_2[j, :] != 0)] # binarized predictions
-                        word_list = []
-                        for idx, value in enumerate(indeces):
-                            word_idx = encodings.token_to_word(j, idx)
-                            word = batch_token['tokens'][j][word_idx] if word_idx is not None else None
-                            word_list.append({'idx': word_idx, 'value': value, 'word': word})
-                        span_left_idx_list = []
-                        span_right_idx_list = []
-                        shift = 0
-                        for k, w in enumerate(word_list):
-                            if w['word'] is not None:
-                                if w['value'] == 1:
-                                    span_left_idx = batch_seq['text'][j][shift:].find(w['word'])
-                                    left = span_left_idx + shift + batch_seq['sent_start'][j]
-                                    right = left + len(w['word'])
-                                    span_left_idx_list.append(left)
-                                    span_right_idx_list.append(right)
-                                elif k > 0 and span_left_idx_list and span_right_idx_list:
-                                    left = min(span_left_idx_list)
-                                    right = max(span_right_idx_list)
-                                    article_id = batch_seq['article_id'][j]
-                                    preds_formatted.append(f'{article_id}\t{tt[1]}\t{left}\t{right}')
-                                    span_left_idx_list = []
-                                    span_right_idx_list = []
                     
                     preds_list.append(out_2['logits'].detach().cpu().numpy())
                     if 'labels' in inputs_token.keys():
@@ -233,6 +230,7 @@ def main():
                     val_loss_tmp = round(eval_loss / (i + 1), 4)
                     progbar_val.set_postfix({'Eval loss': val_loss_tmp})
 
+                preds_formatted = convert_tensors_for_submission(out_1, out_2, batch_seq, batch_token, tokenizer_m2, tt[1])
             all_preds_formatted += preds_formatted
             with open(os.path.join(preds_dir, f'{model_idx}_preds_{tt[1]}_{json_path_simple}_{lang}.txt'), 'w', encoding='utf8') as f:
                 for pred in preds_formatted:
