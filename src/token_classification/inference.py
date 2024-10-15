@@ -1,12 +1,12 @@
 import json
 import sys
 sys.path.append('./src')
-from token_classification.train_sent import span_to_words_annotation, dict_of_lists, list_of_dicts, tokenize_token_classification
+from train_sent import span_to_words_annotation, dict_of_lists, list_of_dicts, tokenize_token_classification
 from seq_classification.train_seq import tokenize_sequence_classification
 from utils_checkthat import regex_tokenizer_mappings
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForTokenClassification, DataCollatorWithPadding, DataCollatorForTokenClassification
 import pandas as pd
-from sequence_aligner.labelset import LabelSet
+from labelset import LabelSet
 from datasets import Dataset
 import os
 from torch.utils.data import DataLoader
@@ -89,7 +89,7 @@ def convert_tensors_for_submission(outputs_1, outputs_2, batch_1, batch_2, token
 
 def main():
 
-    json_path = './data/formatted/test_sentences.json'
+    json_path = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/test_sentences.json'
     json_path_simple = json_path.split('/')[-1].split('.')[0]
 
     with open(json_path, 'r', encoding='utf8') as f:
@@ -98,10 +98,12 @@ def main():
     langs = set([el['data']['lang'] for el in data])
     for lang in langs:
         print(f'Infering on {lang}...')
-        path_m1 = './models/M1/mdeberta-v3-base_ME10_2024-05-13-15-44-12'
+        #path_m1 = './models/M1/mdeberta-v3-base_ME10_2024-05-13-15-44-12'
+        path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/mdeberta-v3-base-NEW/checkpoint-8338'
 
-        model_dir_m2 = './models/M2/2024-05-14-06-51-04_aug_ts0.9'
-        preds_dir = os.path.join('./preds/', model_dir_m2.split('/')[-1])
+        #model_dir_m2 = './models/M2/2024-05-14-06-51-04_aug_ts0.9'
+        model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/2024-10-02-18-10-24_aug_cw_ts0.9'
+        preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', model_dir_m2.split('/')[-1])
         if not os.path.exists(preds_dir):
             os.makedirs(preds_dir)
 
@@ -118,9 +120,13 @@ def main():
                                                 batch_size=None,
                                                 )
         
-        target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/persuasion_techniques.txt').readlines())]
+        target_tags = ["Appeal_to_Authority", "Appeal_to_Popularity","Appeal_to_Values","Appeal_to_Fear-Prejudice","Flag_Waving","Causal_Oversimplification",
+               "False_Dilemma-No_Choice","Consequential_Oversimplification","Straw_Man","Red_Herring","Whataboutism","Slogans","Appeal_to_Time",
+               "Conversation_Killer","Loaded_Language","Repetition","Exaggeration-Minimisation","Obfuscation-Vagueness-Confusion","Name_Calling-Labeling",
+               "Doubt","Guilt_by_Association","Appeal_to_Hypocrisy","Questioning_the_Reputation"]
+        target_tags = [(i, el.strip()) for i, el in enumerate(target_tags)]
         all_preds_formatted = []
-        model_shift = 2
+        model_shift = 0
         for model_idx, tt in enumerate(target_tags):
             # if model_idx < model_shift:
             #     continue

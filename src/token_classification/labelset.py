@@ -3,7 +3,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import itertools
 from typing import List
 
-from .alignment import align_tokens_and_annotations_bio
+from alignment import align_tokens_and_annotations_bio
 
 
 class LabelSet:

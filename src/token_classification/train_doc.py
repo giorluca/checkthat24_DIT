@@ -1,4 +1,4 @@
-from sequence_aligner.labelset import LabelSet
+from checkthat_GITHUB.src.token_classification.labelset import LabelSet
 from sequence_aligner.dataset import TrainingDataset
 from sequence_aligner.containers import TrainingBatch
 import json

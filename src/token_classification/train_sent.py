@@ -1,8 +1,9 @@
 import json
-from sequence_aligner.labelset import LabelSet
+#from labelset import LabelSet
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from torch.utils.data import DataLoader
 import torch
+from tokenizers import Encoding
 from torch.optim import AdamW
 from tqdm import tqdm
 import numpy as np
@@ -21,6 +22,65 @@ from sklearn.metrics import f1_score
 from collections import Counter
 from seqeval.metrics import classification_report
 from transformers import DataCollatorForTokenClassification
+
+import os,sys 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import itertools
+from typing import List
+
+def align_tokens_and_annotations_bio(tokenized: Encoding, annotations):
+    tokens = tokenized.tokens
+    aligned_labels = ["O"] * len(
+        tokens
+    )  # Make a list to store our labels the same length as our tokens
+    for anno in annotations:
+        annotation_token_ix_set = (
+            set()
+        )  # A set that stores the token indices of the annotation
+        for char_ix in range(anno["start"], anno["end"]):
+            print('char_ix = ', char_ix)
+            token_ix = tokenized.char_to_token(char_ix)
+            if token_ix is not None:
+                annotation_token_ix_set.add(token_ix)
+        if len(annotation_token_ix_set) == 1:
+            # If there is only one token
+            token_ix = annotation_token_ix_set.pop()
+            prefix = (
+                "B"  # This annotation spans one token so is prefixed with U for unique
+            )
+            aligned_labels[token_ix] = f"{prefix}-{anno['tag']}"
+
+        else:
+
+            last_token_in_anno_ix = len(annotation_token_ix_set) - 1
+            for num, token_ix in enumerate(sorted(annotation_token_ix_set)):
+                if num == 0:
+                    prefix = "B"
+                elif num == last_token_in_anno_ix:
+                    prefix = "I"  # Its the last token
+                else:
+                    prefix = "I"  # We're inside of a multi token annotation
+                aligned_labels[token_ix] = f"{prefix}-{anno['tag']}"
+    return aligned_labels
+class LabelSet:
+    def __init__(self, labels: List[str]):
+        self.labels_to_id = {}
+        self.ids_to_label = {}
+        self.labels_to_id["O"] = 0
+        self.ids_to_label[0] = "O"
+        num = 0  # in case there are no labels
+        # Writing BILU will give us incremental ids for the labels
+        for _num, (label, s) in enumerate(itertools.product(labels, "BI")):
+            num = _num + 1  # skip 0
+            l = f"{s}-{label}"
+            self.labels_to_id[l] = num
+            self.ids_to_label[num] = l
+
+
+    def get_aligned_label_ids_from_annotations(self, tokenized_text, annotations):
+        raw_labels = align_tokens_and_annotations_bio(tokenized_text, annotations)
+        return list(map(self.labels_to_id.get, raw_labels))
+
 
 def tokenize_token_classification(examples, tokenizer):
     tokenized_inputs = tokenizer(examples["tokens"], truncation=True, is_split_into_words=True, padding='longest', return_tensors='pt')

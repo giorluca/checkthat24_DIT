@@ -10,7 +10,7 @@ import pandas as pd
 import os
 import sys
 sys.path.append('./src')
-from sequence_aligner.labelset import LabelSet
+from checkthat_GITHUB.src.token_classification.labelset import LabelSet
 from utils_checkthat import save_local_model, sub_shift_spans, regex_tokenizer_mappings, get_entities_from_sample
 from icecream import ic
 import re

@@ -5,7 +5,7 @@ from transformers import PreTrainedTokenizerFast
 from typing_extensions import TypedDict
 
 from .containers import TrainingExample
-from .labelset import LabelSet
+from ..token_classification.labelset import LabelSet
 class ExpectedAnnotationShape(TypedDict):
     start:int
     end:int

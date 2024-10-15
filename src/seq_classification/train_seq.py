@@ -17,7 +17,7 @@ sys.path.append('./src')
 from utils_checkthat import save_local_model
 from token_classification.train_sent import dict_of_lists
 from datetime import datetime
-from icecream import ic
+#from icecream import ic
 
 def evaluate(model, val_loader, device):
     model.eval()
