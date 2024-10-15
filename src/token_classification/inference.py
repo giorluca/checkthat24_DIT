@@ -98,12 +98,10 @@ def main():
     langs = set([el['data']['lang'] for el in data])
     for lang in langs:
         print(f'Infering on {lang}...')
-        #path_m1 = './models/M1/mdeberta-v3-base_ME10_2024-05-13-15-44-12'
-        path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/mdeberta-v3-base-NEW/checkpoint-8338'
 
-        #model_dir_m2 = './models/M2/2024-05-14-06-51-04_aug_ts0.9'
-        model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/2024-10-02-18-10-24_aug_cw_ts0.9'
-        preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', model_dir_m2.split('/')[-1])
+        path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/2nd_run/mdeberta-v3-base-NEW_2nd/checkpoint-8338'
+        model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/model_weights'
+        preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', '2024-10-15-09-48-54_aug_cw_ts0.9')
         if not os.path.exists(preds_dir):
             os.makedirs(preds_dir)
 
@@ -130,7 +128,7 @@ def main():
         for model_idx, tt in enumerate(target_tags):
             # if model_idx < model_shift:
             #     continue
-            print(f'Infering with m2 no. {model_idx} of {len(target_tags)} for {tt} persuasion technique...')
+            print(f'Infering with m2 no. {model_idx} of {len(target_tags)} for {tt[1]} persuasion technique...')
             labels_model = LabelSet(labels=[tt[1]])
             
             df_list_binary = span_to_words_annotation(dict_of_lists(data_lang), target_tag=tt[1], mappings=regex_tokenizer_mappings, labels_model=labels_model)
@@ -139,11 +137,21 @@ def main():
             binary_dataset_token = Dataset.from_pandas(df_binary[token_columns])
             
             for model_dir in os.listdir(model_dir_m2):
-                if not re.search(r'\..*$', model_dir):
-                    model_number = int(model_dir.split('_')[1])
+                if os.path.isdir(os.path.join(model_dir_m2, model_dir)) and not re.search(r'\..*$', model_dir):
+                    model_number = int(model_dir.split('_')[2])
                     if model_number == model_idx:
-                        path_m2 = os.path.join(model_dir_m2, model_dir)
-                        break
+                        model_path = os.path.join(model_dir_m2, model_dir)
+                        checkpoints = sorted([d for d in os.listdir(model_path) if os.path.isdir(os.path.join(model_path, d)) and 'checkpoint' in d])
+                        if len(checkpoints) >= 2:
+                            second_checkpoint = checkpoints[1]  # Access the second checkpoint
+                            second_checkpoint_path = os.path.join(model_path, second_checkpoint)
+                            trainer_state_file = os.path.join(second_checkpoint_path, 'trainer_state.json')
+                            if os.path.exists(trainer_state_file):
+                                with open(trainer_state_file, 'r') as f:
+                                    path_m2_tmp = json.load(f)['best_model_checkpoint']
+                                    split_path = path_m2_tmp.split("weights_and_results/")
+                                    path_m2 = split_path[0] + "weights_and_results/model_weights/" + split_path[1]
+                                    break
 
             
             columns = [ 'input_ids',

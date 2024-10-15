@@ -12,7 +12,7 @@ import pandas as pd
 import os
 import sys
 sys.path.append('./src')
-from utils_checkthat import save_local_model, sub_shift_spans, regex_tokenizer_mappings
+#from utils_checkthat import save_local_model, sub_shift_spans, regex_tokenizer_mappings
 from icecream import ic
 import re
 from datetime import datetime
@@ -27,6 +27,51 @@ import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import itertools
 from typing import List
+
+regex_tokenizer_mappings = [
+    {'pattern': r'(?<!\s)([^\w\s])|([^\w\s])(?!\s)',
+    'target': ' placeholder ',
+    'check': lambda x: unicodedata.category(x).startswith('P'),
+    },
+    {'pattern': r'\s+',
+     'target': ' ',
+     'check': lambda x: False if re.match('\s+', x) is None else True,
+     },
+    ]
+
+def sub_shift_spans(text, ents = [], mappings = []):
+    for mapping in mappings:
+        adjustment = 0
+        pattern = re.compile(mapping['pattern'])
+        for match in re.finditer(pattern, text):
+            match_index = match.start() + adjustment
+            match_contents = match.group()
+            if all(mapping['check'](char) for char in match_contents):
+                subbed_text = mapping['target'].replace('placeholder', match_contents)
+            else:
+                subbed_text = mapping['target']
+            len_diff = len(subbed_text) - len(match_contents)
+            text = text[:match_index] + subbed_text + text[match_index + len(match_contents):]
+            if ents:
+                if isinstance(ents, list):
+                    for ent in ents:
+                        if ent['start'] <= match_index and ent['end'] > match_index:
+                            ent['end'] += len_diff
+                        if ent['start'] > match_index:
+                            ent['start'] += len_diff
+                            ent['end'] += len_diff
+                elif isinstance(ents, dict):
+                    if ents['value']['start'] <= match_index and ents['value']['end'] > match_index:
+                        ents['value']['end'] += len_diff
+                    if ents['value']['start'] > match_index:
+                        ents['value']['start'] += len_diff
+                        ents['value']['end'] += len_diff
+
+            adjustment += len_diff
+    # for ent in ent_list:
+    #     ic(text[ent['start']:ent['end']])
+
+    return text, ents
 
 def align_tokens_and_annotations_bio(tokenized: Encoding, annotations):
     tokens = tokenized.tokens
