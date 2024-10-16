@@ -7,6 +7,7 @@ from utils_checkthat import regex_tokenizer_mappings
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForTokenClassification, DataCollatorWithPadding, DataCollatorForTokenClassification
 import pandas as pd
 from labelset import LabelSet
+from datetime import datetime
 from datasets import Dataset
 import os
 from torch.utils.data import DataLoader
@@ -88,6 +89,7 @@ def convert_tensors_for_submission(outputs_1, outputs_2, batch_1, batch_2, token
     return preds_formatted
 
 def main():
+    date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
     json_path = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/test_sentences.json'
     json_path_simple = json_path.split('/')[-1].split('.')[0]
@@ -101,7 +103,7 @@ def main():
 
         path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/2nd_run/mdeberta-v3-base-NEW_2nd/checkpoint-8338'
         model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/model_weights'
-        preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', '2024-10-15-09-48-54_aug_cw_ts0.9')
+        preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', f'{date_time}'+'_aug_cw_ts0.9')
         if not os.path.exists(preds_dir):
             os.makedirs(preds_dir)
 
@@ -136,15 +138,22 @@ def main():
             token_columns = ['id', 'ner_tags', 'tokens']
             binary_dataset_token = Dataset.from_pandas(df_binary[token_columns])
             
+            #for using the best or the last checkpoint saved
             for model_dir in os.listdir(model_dir_m2):
                 if os.path.isdir(os.path.join(model_dir_m2, model_dir)) and not re.search(r'\..*$', model_dir):
                     model_number = int(model_dir.split('_')[2])
                     if model_number == model_idx:
                         model_path = os.path.join(model_dir_m2, model_dir)
-                        checkpoints = sorted([d for d in os.listdir(model_path) if os.path.isdir(os.path.join(model_path, d)) and 'checkpoint' in d])
+                        checkpoints = [d for d in os.listdir(model_path) if os.path.isdir(os.path.join(model_path, d)) and 'checkpoint' in d]
                         if len(checkpoints) >= 2:
                             second_checkpoint = checkpoints[1]  # Access the second checkpoint
                             second_checkpoint_path = os.path.join(model_path, second_checkpoint)
+                            
+                            #for using the last checkpoint:
+                            #path_m2 = second_checkpoint_path
+                            #break
+                            
+                            #for using the best checkpoint:
                             trainer_state_file = os.path.join(second_checkpoint_path, 'trainer_state.json')
                             if os.path.exists(trainer_state_file):
                                 with open(trainer_state_file, 'r') as f:
