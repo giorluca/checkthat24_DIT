@@ -58,11 +58,57 @@ def tokenize_sequence_classification(examples, tokenizer):
                                 padding = 'longest',
                                 return_tensors='pt'
                                 )
-    
+
     output['labels'] = torch.tensor(data['label'])
     output.update(data)
     output['annotations'] = annotations
     return output
+
+def tokenize_sequence_classification_sliding_window(examples, tokenizer, max_length=512, stride=128):
+    annotations = examples['annotations']
+    data = dict_of_lists(examples['data'])
+    texts = data["text"]
+    
+    all_inputs = {
+        'input_ids': [],
+        'attention_mask': [],
+        'labels': [],
+        'annotations': []
+    }
+    
+    for i, text in enumerate(texts):
+        tokenized_text = tokenizer(
+            text,
+            truncation=False,  # No truncation, since we manually handle the windowing
+            padding=False,     # No padding initially, we will handle it later
+            return_tensors='pt',
+            max_length=max_length,
+            stride=stride,
+            return_overflowing_tokens=True,  # This handles the windows
+            return_offsets_mapping=False     # Can be used if needed, but omitted here
+        )
+
+        # Get the number of overflow windows
+        num_windows = len(tokenized_text['input_ids'])
+        
+        # Assign labels to all windows (can be changed based on task)
+        label = data['label'][i]
+
+        for j in range(num_windows):
+            all_inputs['input_ids'].append(tokenized_text['input_ids'][j])
+            all_inputs['attention_mask'].append(tokenized_text['attention_mask'][j])
+            all_inputs['labels'].append(torch.tensor(label))
+            all_inputs['annotations'].append(annotations[i])
+
+    # Pad the batches to the longest sequence
+    output = tokenizer.pad(
+        all_inputs,
+        padding='longest',
+        return_tensors='pt'
+    )
+
+    return output
+
 
 def main():
     date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
