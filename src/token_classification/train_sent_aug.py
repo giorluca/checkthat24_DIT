@@ -9,8 +9,8 @@ from datasets import Dataset, concatenate_datasets
 import pandas as pd
 import os
 import sys
-sys.path.append('./src')
-from checkthat_GITHUB.src.token_classification.labelset import LabelSet
+sys.path.append('/home/lgiordano/LUCA/checkthat_GITHUB/src/token_classification')
+from labelset import LabelSet
 from utils_checkthat import save_local_model, sub_shift_spans, regex_tokenizer_mappings, get_entities_from_sample
 from icecream import ic
 import re
@@ -237,22 +237,22 @@ def make_binary_balanced_df(df, target_tag='', labels_model=[]):
     df_list_binary = span_to_words_annotation(dict_of_lists(df_list), target_tag=target_tag, mappings=regex_tokenizer_mappings, labels_model=labels_model)
     df_binary = pd.DataFrame(df_list_binary)
     df_binary_pos = df_binary[df_binary['tag'] == target_tag]
-    df_binary_neg = df_binary[df_binary['tag'] != target_tag].sample(len(df_binary_pos), replace=True)  # Over-sampling
+    df_binary_neg = df_binary[df_binary['tag'] != target_tag].sample(len(df_binary_pos), replace=True)  # Under-sampling
     df_binary_subsampled = pd.concat([df_binary_pos, df_binary_neg])
     return df_binary_subsampled
 
 def main():
-    data_gold = './data/formatted/train_sentences.json'
+    data_gold = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/train_sentences.json'
     with open(data_gold, 'r', encoding='utf8') as f:
         dataset_gold = json.load(f)
 
     data_path_dict = {
-    'sl': './data/train_sent_mt/sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn_tok_regex_en-sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn_tok_regex_en-sl_mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14_ls.json',
-    'ru': './data/train_sent_mt/ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl_tok_regex_en-ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl_tok_regex_en-ru_mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20_ls.json',
-    'pt': './data/train_sent_mt/pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn_tok_regex_en-pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn_tok_regex_en-pt_mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45_ls.json',
-    'it': './data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it_mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00_ls.json',
-    'es': './data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es_mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43_ls.json',
-    'bg': './data/train_sent_mt/bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl_tok_regex_en-bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl_tok_regex_en-bg_mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52_ls.json',
+    'sl': '/home/lgiordano/LUCA/checkthat_GITHUB//data/train_sent_mt/sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn_tok_regex_en-sl/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-slv_Latn_tok_regex_en-sl_mdeberta-v3-base_mdeberta_xlwa_en-sl_ME3_2024-05-04-12-12-14_ls.json',
+    'ru': '/home/lgiordano/LUCA/checkthat_GITHUB//data/train_sent_mt/ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl_tok_regex_en-ru/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-rus_Cyrl_tok_regex_en-ru_mdeberta-v3-base_mdeberta_xlwa_en-ru_ME3_2024-05-04-12-09-20_ls.json',
+    'pt': '/home/lgiordano/LUCA/checkthat_GITHUB//data/train_sent_mt/pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn_tok_regex_en-pt/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-por_Latn_tok_regex_en-pt_mdeberta-v3-base_mdeberta_xlwa_en-pt_ME3_2024-05-04-12-07-45_ls.json',
+    'it': '/home/lgiordano/LUCA/checkthat_GITHUB//data/train_sent_mt/it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-ita_Latn_tok_regex_en-it_mdeberta-v3-base_mdeberta_xlwa_en-it_ME3_2024-05-04-12-05-00_ls.json',
+    'es': '/home/lgiordano/LUCA/checkthat_GITHUB//data/train_sent_mt/es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-spa_Latn_tok_regex_en-es_mdeberta-v3-base_mdeberta_xlwa_en-es_ME3_2024-05-04-12-01-43_ls.json',
+    'bg': '/home/lgiordano/LUCA/checkthat_GITHUB//data/train_sent_mt/bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl_tok_regex_en-bg/train_gold_sentences_translated_nllb-200-3.3B_eng_Latn-bul_Cyrl_tok_regex_en-bg_mdeberta-v3-base_mdeberta_xlwa_en-bg_ME3_2024-05-04-11-58-52_ls.json',
     }
     dataset_aug = []
     for key in data_path_dict:
@@ -274,8 +274,13 @@ def main():
     df_aug = pd.DataFrame(dataset_aug)
     balanced_df_aug = make_balanced_df(df_aug)
     
-    target_tags = [(i, el.strip()) for i, el in enumerate(open('./data/persuasion_techniques.txt').readlines())]
-    shift = 14
+    target_tags = ["Appeal_to_Authority", "Appeal_to_Popularity","Appeal_to_Values","Appeal_to_Fear-Prejudice","Flag_Waving","Causal_Oversimplification",
+               "False_Dilemma-No_Choice","Consequential_Oversimplification","Straw_Man","Red_Herring","Whataboutism","Slogans","Appeal_to_Time",
+               "Conversation_Killer","Loaded_Language","Repetition","Exaggeration-Minimisation","Obfuscation-Vagueness-Confusion","Name_Calling-Labeling",
+               "Doubt","Guilt_by_Association","Appeal_to_Hypocrisy","Questioning_the_Reputation"]
+    target_tags = [(i, el.strip()) for i, el in enumerate(target_tags)]
+
+    shift = 0
     for i, tt in enumerate(target_tags):
         if i < shift:
             continue
@@ -391,9 +396,9 @@ def main():
         
         results['best_epoch'] = best_epoch + 1
         
-        models_dir = './models/M2'
+        models_dir = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2'
         model_save_name = f'{model_name_simple}_{tt[0]}_ME{epochs}_target={tt[1]}_SUBSAMPLED_{date_time}'
-        model_save_dir = os.path.join(models_dir, date_time+'_aug'+'_ts'+str(threshold), model_save_name)
+        model_save_dir = os.path.join(models_dir, date_time+'_aug'+'_ts'+str(threshold)+'RERUN_29_10', model_save_name)
         if not os.path.exists(model_save_dir):
             os.makedirs(model_save_dir)
         save_local_model(model_save_dir, best_model, tokenizer)

@@ -79,8 +79,8 @@ def find_best_m2_checkpoint(model_dir, model_idx):
                         if os.path.exists(trainer_state_file):
                             with open(trainer_state_file, 'r') as f:
                                 path_m2_tmp = json.load(f)['best_model_checkpoint']
-                                split_path = path_m2_tmp.split("weights_and_results/")
-                                best_model_checkpoint = split_path[0] + "weights_and_results/model_weights/" + split_path[1]                                
+                                split_path = path_m2_tmp.split("cw_ts0.9/")
+                                best_model_checkpoint = split_path[0] + "cw_ts0.9/weights/" + split_path[1]                                
                                 logging.info(f"Found best checkpoint: {best_model_checkpoint}")
                                 return best_model_checkpoint
             except (IndexError, ValueError) as e:
@@ -160,9 +160,9 @@ def main():
         for lang in langs:
             logging.info(f'Inferring on {lang}...')
 
-            path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/2nd_run/mdeberta-v3-base-NEW_2nd/checkpoint-8338'
-            model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/model_weights'
-            preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', f'{date_time}'+'_aug_cw_ts0.9')
+            path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/no aug, lr 5e-5/checkpoint-12507'
+            model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/2024-10-31-10-16-40_aug_cw_ts0.9/weights'
+            preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', f'{date_time}'+'_aug_cw_ts0.9_M1_paper_M2_augcwts_ricreato')
             os.makedirs(preds_dir, exist_ok=True)
 
             # Load and verify models
@@ -188,9 +188,9 @@ def main():
             logging.info(f"Processed {len(binary_dataset_seq)} samples for sequence classification")
 
             target_tags = ["Appeal_to_Authority", "Appeal_to_Popularity", "Appeal_to_Values", "Appeal_to_Fear-Prejudice", "Flag_Waving", "Causal_Oversimplification",
-                           "False_Dilemma-No_Choice", "Consequential_Oversimplification", "Straw_Man", "Red_Herring", "Whataboutism", "Slogans", "Appeal_to_Time",
-                           "Conversation_Killer", "Loaded_Language", "Repetition", "Exaggeration-Minimisation", "Obfuscation-Vagueness-Confusion", "Name_Calling-Labeling",
-                           "Doubt", "Guilt_by_Association", "Appeal_to_Hypocrisy", "Questioning_the_Reputation"]
+                        "False_Dilemma-No_Choice", "Consequential_Oversimplification", "Straw_Man", "Red_Herring", "Whataboutism", "Slogans", "Appeal_to_Time",
+                        "Conversation_Killer", "Loaded_Language", "Repetition", "Exaggeration-Minimisation", "Obfuscation-Vagueness-Confusion", "Name_Calling-Labeling",
+                        "Doubt", "Guilt_by_Association", "Appeal_to_Hypocrisy", "Questioning_the_Reputation"]
             target_tags = [(i, el.strip()) for i, el in enumerate(target_tags)]
             all_preds_formatted = []
 
@@ -207,9 +207,9 @@ def main():
                     path_m2 = find_best_m2_checkpoint(model_dir_m2, model_idx)
                     tokenizer_m2 = AutoTokenizer.from_pretrained(path_m2)
                     m2 = AutoModelForTokenClassification.from_pretrained(path_m2,
-                                                                         num_labels=len(labels_model.ids_to_label.values()),
-                                                                         label2id=labels_model.labels_to_id,
-                                                                         id2label=labels_model.ids_to_label)
+                                                                        num_labels=len(labels_model.ids_to_label.values()),
+                                                                        label2id=labels_model.labels_to_id,
+                                                                        id2label=labels_model.ids_to_label)
                     logging.info(f"Successfully loaded M2 model from {path_m2}")
                 except Exception as e:
                     logging.error(f"Error loading M2 model: {str(e)}")

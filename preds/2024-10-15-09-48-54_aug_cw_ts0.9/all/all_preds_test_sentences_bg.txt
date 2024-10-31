@@ -1,5 +1,0 @@
-4199	Appeal_to_Values	939	1009
-4199	Appeal_to_Values	938	1118
-4199	Appeal_to_Values	1356	1462
-4199	Appeal_to_Fear-Prejudice	1604	1668
-4199	False_Dilemma-No_Choice	769	888
