@@ -1,0 +1,5 @@
+42101	Appeal_to_Values	3518	3549
+42136	Appeal_to_Values	7973	8006
+4219	Appeal_to_Values	2582	2647
+4219	Appeal_to_Values	2653	2667
+4281	Appeal_to_Values	4617	4643

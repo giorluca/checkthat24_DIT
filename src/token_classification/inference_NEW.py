@@ -194,7 +194,7 @@ def main():
             target_tags = [(i, el.strip()) for i, el in enumerate(target_tags)]
             all_preds_formatted = []
 
-            for model_idx, tt in enumerate(target_tags):
+            for model_idx, tt in enumerate(target_tags[18:], start=18):
                 logging.info(f'Inferring with m2 no. {model_idx} of {len(target_tags)} for {tt[1]} persuasion technique...')
                 labels_model = LabelSet(labels=[tt[1]])
                 
