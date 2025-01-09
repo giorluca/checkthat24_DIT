@@ -142,7 +142,7 @@ def main():
     try:
         date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        json_path = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/test_sentences.json'
+        json_path = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/dev_sentences.json'
         json_path_simple = json_path.split('/')[-1].split('.')[0]
 
         # Load and validate input data
@@ -160,9 +160,9 @@ def main():
         for lang in langs:
             logging.info(f'Inferring on {lang}...')
 
-            path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/no aug, lr 5e-5/checkpoint-12507'
-            model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/2024-10-31-10-16-40_aug_cw_ts0.9/weights'
-            preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', f'{date_time}'+'_aug_cw_ts0.9_M1_paper_M2_augcwts_ricreato')
+            path_m1 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/aug/aug, lr 2e-5, + ARAIEVAL(news) & SEMEVAL24/checkpoint-27118' #'/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/no aug, lr 5e-5/checkpoint-12507'
+            model_dir_m2 = '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/2024-10-24-13-02-35_aug_cw_ts0.9/weights' #'/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/2024-10-31-10-16-40_aug_cw_ts0.9/weights'
+            preds_dir = os.path.join('/home/lgiordano/LUCA/checkthat_GITHUB/preds/', f'DEV_{date_time}'+'_aug_cw_ts0.9_BEST_ARAIEVAL_SEMEVAL')
             os.makedirs(preds_dir, exist_ok=True)
 
             # Load and verify models
@@ -194,8 +194,8 @@ def main():
             target_tags = [(i, el.strip()) for i, el in enumerate(target_tags)]
             all_preds_formatted = []
 
-            for model_idx, tt in enumerate(target_tags[18:], start=18):
-                logging.info(f'Inferring with m2 no. {model_idx} of {len(target_tags)} for {tt[1]} persuasion technique...')
+            for model_idx, tt in enumerate(target_tags, start=0):
+                logging.info(f'Inferring with m2 no. {model_idx} of {len(target_tags)-1} for {tt[1]} persuasion technique...')
                 labels_model = LabelSet(labels=[tt[1]])
                 
                 df_list_binary = span_to_words_annotation(dict_of_lists(data_lang), target_tag=tt[1], mappings=regex_tokenizer_mappings, labels_model=labels_model)
