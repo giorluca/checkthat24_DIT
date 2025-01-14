@@ -142,7 +142,7 @@ def main():
     try:
         date_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        json_path = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/dev_sentences.json'
+        json_path = '/home/lgiordano/LUCA/checkthat_GITHUB/data/formatted/train_sentences.json'
         json_path_simple = json_path.split('/')[-1].split('.')[0]
 
         # Load and validate input data
