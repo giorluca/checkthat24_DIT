@@ -29,8 +29,8 @@ CONFIG = {
     'chunk_size': 2000,
     'cleanup_interval': 10,
     'model_paths': {
-        'm1': '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/no aug, lr 2e-5/2025-01-16-14-39-53/checkpoint-8338',
-        'm2': '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/2025-01-16-15-10-10_no_aug_no_cw_ts0/weights'
+        'm1': '/home/lgiordano/LUCA/checkthat_GITHUB/models/M1/RUN_OTTOBRE/aug/aug, lr 2e-5, + ARAIEVAL(news) & SEMEVAL24/2025-01-16-13-01-16_aug/checkpoint-47691',
+        'm2': '/home/lgiordano/LUCA/checkthat_GITHUB/models/M2/RUN_OTTOBRE/weights_and_results/2025-01-13-16-36-34_aug_no_cw_ts0_+ARAIEVAL(news)_&_SEMEVAL24/weights'
     },
     'target_tags': [
         "Appeal_to_Authority", "Appeal_to_Popularity", "Appeal_to_Values", 
@@ -161,7 +161,10 @@ def find_best_m2_checkpoint(model_dir: str, model_idx: int) -> str:
                 continue
                 
             with open(trainer_state_file, 'r') as f:
-                best_model_checkpoint = json.load(f)['best_model_checkpoint']
+                #best_model_checkpoint = json.load(f)['best_odel_checkpoint']
+                path_m2_tmp = json.load(f)['best_model_checkpoint']
+                split_path = path_m2_tmp.split("SEMEVAL24/")
+                best_model_checkpoint = split_path[0] + "SEMEVAL24/weights/" + split_path[1]      
                 logging.info(f"Found best checkpoint: {best_model_checkpoint}")
                 return best_model_checkpoint
                 
@@ -354,7 +357,7 @@ def main():
             # Process each target tag
             model_dir_m2 = CONFIG['model_paths']['m2']
             
-            for model_idx, target_tag in enumerate(target_tags[:1]):
+            for model_idx, target_tag in enumerate(target_tags):
                 logging.info(f'Processing model {model_idx} of {len(target_tags)-1} for {target_tag}')
                 
                 try:
@@ -480,8 +483,8 @@ def main():
                 )
 
                 # Save results
-                os.makedirs(f'/home/lgiordano/LUCA/checkthat_GITHUB/preds/{date_time}_SIGIR_{CONFIG["aug"][0]}_inference_results', exist_ok=True)
-                results_path = f'/home/lgiordano/LUCA/checkthat_GITHUB/preds/{date_time}_SIGIR_{CONFIG["aug"][0]}_inference_results/results_{lang}_{date_time}.json'
+                os.makedirs(f'/home/lgiordano/LUCA/checkthat_GITHUB/preds/{date_time}_SIGIR_{CONFIG["aug"][3]}_inference_results', exist_ok=True)
+                results_path = f'/home/lgiordano/LUCA/checkthat_GITHUB/preds/{date_time}_SIGIR_{CONFIG["aug"][3]}_inference_results/results_{lang}_{date_time}.json'
                 with open(results_path, 'w') as f:
                     json.dump({
                         'language': lang,
