@@ -168,6 +168,7 @@ class PersuasionTechniqueDetector:
                         }
                 else:
                     # Extend existing span
+                    token_text = ' ' + token_text
                     current_span['text'] += token_text
             
             # End of a span
@@ -278,11 +279,11 @@ def main():
     )
     
     # Data
-    df = pd.read_csv('/home/lgiordano/LUCA/CG_EN.csv', sep=',', encoding='utf-8')
+    df = pd.read_csv('/home/lgiordano/LUCA/kremlin.ru_en_2024.csv', sep=',', encoding='utf-8')
 
     # Detect and export persuasion techniques
     for i, text in enumerate(df['text']):
-        output_dir = f'/home/lgiordano/LUCA/CG_EN_persuasion_techniques_output/text_{i}'
+        output_dir = f'/home/lgiordano/LUCA/kremlin_persuasion_techniques_output/text_{i}'
         results = detector.export_results(text, output_dir)
         
         # Print summary to console
